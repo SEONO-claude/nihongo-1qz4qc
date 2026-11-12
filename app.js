@@ -43,33 +43,55 @@ function addXP(n, x, y) {
   }
 }
 
-// ───── 효과음 (기기 안에서 바로 만듦, 인터넷 필요 없음) ─────
-let audioCtx = null
-// 아이폰: 무음 모드에서도 앱 효과음이 나게 'playback'으로 설정 (효과음 버튼으로 끌 수 있음).
-// 아이폰은 사용자가 화면을 처음 누를 때 소리를 켜 줘야 해서, 첫 터치에 소리 없는 소리를 한 번 낸다.
-function audio() {
-  if (!audioCtx) {
-    try { if (navigator.audioSession) navigator.audioSession.type = 'playback' } catch { /* 지원 안 함 */ }
-    audioCtx = new (window.AudioContext || window.webkitAudioContext)()
-  }
-  if (audioCtx.state !== 'running') audioCtx.resume().catch(() => {})
-  return audioCtx
-}
-// 아이폰은 Web Audio 소리를 무음 모드에서 막지만, 오디오 플레이어(<audio>)는 무음 모드에서도 소리가 난다.
-// 오디오 플레이어가 재생 중이면 Web Audio 효과음도 같이 나므로, 첫 터치 때 배경음악(또는 소리 없는 오디오)을 튼다.
-function silentWavURL() {
-  const n = 4000, buf = new Uint8Array(44 + n), v = new DataView(buf.buffer)
-  const str = (o, s) => [...s].forEach((c, i) => buf[o + i] = c.charCodeAt(0))
-  str(0, 'RIFF'); v.setUint32(4, 36 + n, true); str(8, 'WAVEfmt '); v.setUint32(16, 16, true)
-  v.setUint16(20, 1, true); v.setUint16(22, 1, true); v.setUint32(24, 8000, true); v.setUint32(28, 8000, true)
-  v.setUint16(32, 1, true); v.setUint16(34, 8, true); str(36, 'data'); v.setUint32(40, n, true)
-  buf.fill(128, 44)
+// ───── 소리 (효과음 · 배경음악) ─────
+// 아이폰은 Web Audio 소리를 무음 모드에서 막지만, 오디오 플레이어(<audio>) 소리는 무음 모드에서도 낸다.
+// 그래서 Web Audio는 쓰지 않는다. 효과음은 앱이 켜질 때 짧은 WAV 파일로 미리 만들어 두고 오디오 플레이어로 튼다.
+
+// 음 몇 개를 이어 붙인 짧은 소리를 WAV 파일로 만든다 (인터넷 필요 없음)
+function renderTone(freqs, { dur = 0.13, type = 'triangle', gap = 0.09, vol = 0.3 } = {}) {
+  const rate = 22050, len = Math.ceil(rate * ((freqs.length - 1) * gap + dur + 0.05))
+  const pcm = new Float32Array(len)
+  freqs.forEach((f, i) => {
+    const start = Math.floor(i * gap * rate), n = Math.floor(dur * rate)
+    for (let k = 0; k < n && start + k < len; k++) {
+      const t = k / rate, ph = (f * t) % 1
+      const wave = type === 'sine' ? Math.sin(2 * Math.PI * ph) : 1 - 4 * Math.abs(ph - 0.5)   // 삼각파
+      const env = Math.min(1, t / 0.012) * Math.exp(-5 * t / dur)                              // 빠르게 켜지고 천천히 사라짐
+      pcm[start + k] += wave * env * vol
+    }
+  })
+  const buf = new ArrayBuffer(44 + len * 2), v = new DataView(buf)
+  const str = (o, s) => [...s].forEach((c, i) => v.setUint8(o + i, c.charCodeAt(0)))
+  str(0, 'RIFF'); v.setUint32(4, 36 + len * 2, true); str(8, 'WAVEfmt '); v.setUint32(16, 16, true)
+  v.setUint16(20, 1, true); v.setUint16(22, 1, true); v.setUint32(24, rate, true); v.setUint32(28, rate * 2, true)
+  v.setUint16(32, 2, true); v.setUint16(34, 16, true); str(36, 'data'); v.setUint32(40, len * 2, true)
+  for (let k = 0; k < len; k++) v.setInt16(44 + k * 2, Math.max(-1, Math.min(1, pcm[k])) * 32767, true)
   return URL.createObjectURL(new Blob([buf], { type: 'audio/wav' }))
 }
-let keepAlive = null, bgm = null, bgmGain = null, bgmURL = null
-const BGM_VOLUME = 0.7   // 음악 파일 자체를 작게(-26 LUFS) 만들어 두었으므로 여기서는 조금만 줄인다
 
-// 배경음악 파일을 미리 받아 둔다 (첫 터치 때 바로 틀 수 있게)
+const SFX_DEF = {
+  good: [[659, 988], { gap: 0.08 }],
+  combo: [[659, 880, 1175], { gap: 0.07 }],
+  bad: [[247, 196], { type: 'sine', gap: 0.12, dur: 0.22, vol: 0.32 }],
+  done: [[523, 659, 784, 1047, 1319], { gap: 0.09, dur: 0.22 }],
+  tap: [[523], { dur: 0.05, vol: 0.12, type: 'sine' }],
+  stamp: [[110, 82], { type: 'sine', gap: 0.05, dur: 0.2, vol: 0.5 }],
+}
+const SFX_URL = {}
+try { for (const [name, [f, o]] of Object.entries(SFX_DEF)) SFX_URL[name] = renderTone(f, o) } catch { /* 소리 없이 */ }
+
+function playSfx(name) {
+  if (!progress.sound || !SFX_URL[name]) return
+  try {
+    const a = new Audio(SFX_URL[name])
+    a.setAttribute('playsinline', '')
+    a.play().catch(() => {})
+  } catch { /* 소리를 낼 수 없는 기기 */ }
+}
+const SFX = Object.fromEntries(Object.keys(SFX_DEF).map(n => [n, () => playSfx(n)]))
+
+// 배경음악: 파일 자체를 작게(-26 LUFS) 만들어 두었으므로 오디오 플레이어로 바로 튼다
+let bgm = null, bgmURL = null
 ;(function preloadBgm() {
   // 한 파일로 묶은 페이지(claude.ai 링크)에는 음악이 글자로 들어 있어 직접 풀어 쓴다
   if (window.APP_AUDIO) {
@@ -84,72 +106,25 @@ const BGM_VOLUME = 0.7   // 음악 파일 자체를 작게(-26 LUFS) 만들어 �
 })()
 
 function playBgm() {
-  if (!bgmURL) return false
+  if (!bgmURL || !progress.music) return
   try {
-    if (!bgm) {
-      bgm = new Audio(bgmURL); bgm.loop = true; bgm.preload = 'auto'
-      // 아이폰은 오디오 플레이어 볼륨을 못 바꾸므로 Web Audio 볼륨 조절기를 거친다
-      const c = audio(), node = c.createMediaElementSource(bgm)
-      bgmGain = c.createGain(); bgmGain.gain.value = BGM_VOLUME
-      node.connect(bgmGain); bgmGain.connect(c.destination)
-    }
+    if (!bgm) { bgm = new Audio(bgmURL); bgm.loop = true; bgm.setAttribute('playsinline', '') }
     bgm.play().catch(() => {})
-    return true
-  } catch { return false }
+  } catch { /* 소리를 낼 수 없는 기기 */ }
 }
 function stopBgm() { if (bgm) bgm.pause() }
 
+// 아이폰은 사용자가 화면을 누를 때만 소리를 시작할 수 있어서, 누를 때마다 배경음악이 꺼져 있으면 다시 켠다
 function startAudio() {
-  if (!progress.sound && !progress.music) return
-  try {
-    audio()
-    if (progress.music && playBgm()) { if (keepAlive) keepAlive.pause(); return }
-    if (progress.sound) {
-      keepAlive = keepAlive || Object.assign(new Audio(silentWavURL()), { loop: true })
-      keepAlive.play().catch(() => {})
-    }
-  } catch { /* 소리를 낼 수 없는 기기 */ }
+  try { if (navigator.audioSession) navigator.audioSession.type = 'playback' } catch { /* 지원 안 함 */ }
+  if (progress.music && (!bgm || bgm.paused) && !document.hidden) playBgm()
 }
-// 첫 터치마다 시도하고, 소리가 켜지면 더 하지 않는다
-function onGesture() {
-  startAudio()
-  const playing = (bgm && !bgm.paused) || (keepAlive && !keepAlive.paused)
-  if (playing && audioCtx && audioCtx.state === 'running') {
-    for (const ev of ['touchend', 'click', 'keydown']) document.removeEventListener(ev, onGesture, true)
-  }
-}
-for (const ev of ['touchend', 'click', 'keydown']) document.addEventListener(ev, onGesture, true)
+for (const ev of ['touchend', 'click', 'keydown']) document.addEventListener(ev, startAudio, true)
 // 다른 앱으로 가면 배경음악을 멈추고, 돌아오면 다시 튼다
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) stopBgm()
   else if (progress.music && bgm) bgm.play().catch(() => {})
 })
-
-function tone(freqs, { dur = 0.13, type = 'triangle', gap = 0.09, vol = 0.16 } = {}) {
-  if (!progress.sound) return
-  try {
-    audio()
-    const t0 = audioCtx.currentTime + 0.02
-    freqs.forEach((f, i) => {
-      const o = audioCtx.createOscillator(), g = audioCtx.createGain()
-      const s = t0 + i * gap
-      o.type = type; o.frequency.setValueAtTime(f, s)
-      g.gain.setValueAtTime(0.0001, s)
-      g.gain.exponentialRampToValueAtTime(vol, s + 0.012)
-      g.gain.exponentialRampToValueAtTime(0.0001, s + dur)
-      o.connect(g); g.connect(audioCtx.destination)
-      o.start(s); o.stop(s + dur + 0.03)
-    })
-  } catch { /* 소리를 낼 수 없는 기기 */ }
-}
-const SFX = {
-  good: () => tone([659, 988], { gap: 0.08 }),
-  combo: () => tone([659, 880, 1175], { gap: 0.07 }),
-  bad: () => tone([247, 196], { type: 'sine', gap: 0.12, dur: 0.2, vol: 0.14 }),
-  done: () => tone([523, 659, 784, 1047, 1319], { gap: 0.09, dur: 0.2 }),
-  tap: () => tone([523], { dur: 0.05, vol: 0.05, type: 'sine' }),
-  stamp: () => tone([110, 82], { type: 'sine', gap: 0.05, dur: 0.18, vol: 0.25 }),
-}
 
 // 벚꽃잎·별 터뜨리기
 const PETAL_COLORS = ['#ff8fb1', '#ffb3c8', '#ffc23c', '#35a7ff', '#4cc27a', '#ff6b95']
