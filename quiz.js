@@ -75,7 +75,7 @@ const SCHOOLS = [
       { id: 'e6', name: '6학년', parts: [{ t: 'kanji', grades: [6], n: 4 }, { t: 'verb', level: 'elem', n: 3 }, { t: 'grammar', levels: ['N4'], n: 3 }] },
       { id: 'ef', name: '졸업 시험', boss: true, parts: [{ t: 'kanji', grades: [1, 2, 3, 4, 5, 6], n: 4 }, { t: 'verb', level: 'elem', n: 3 }, { t: 'grammar', levels: ['N5', 'N4'], n: 3 }] },
     ] },
-  { id: 'mid', name: '중학교', mark: '中', color: 'sky', reward: '졸업장 · 고등 동사 · N2 문법',
+  { id: 'mid', name: '중학교', mark: '中', color: 'sky', reward: '졸업장 · 고등 한자 · 고등 동사 · N2 문법',
     stages: [
       { id: 'm1', name: '1학년', parts: [{ t: 'kanji', grades: [7], n: 4 }, { t: 'verb', level: 'mid', n: 3 }, { t: 'grammar', levels: ['N4'], n: 3 }] },
       { id: 'm2', name: '2학년', parts: [{ t: 'kanji', grades: [8], n: 4 }, { t: 'verb', level: 'mid', n: 3 }, { t: 'grammar', levels: ['N4', 'N3'], n: 3 }] },
@@ -84,10 +84,11 @@ const SCHOOLS = [
     ] },
   { id: 'high', name: '고등학교', mark: '高', color: 'leaf', reward: '졸업장 · JLPT 마스터',
     stages: [
-      { id: 'h1', name: '1학년', parts: [{ t: 'verb', level: 'high', n: 4 }, { t: 'grammar', levels: ['N3'], n: 4 }, { t: 'kanji', grades: [7, 8, 9], n: 2 }] },
-      { id: 'h2', name: '2학년', parts: [{ t: 'verb', level: 'high', n: 4 }, { t: 'grammar', levels: ['N2'], n: 4 }, { t: 'kanji', grades: [7, 8, 9], n: 2 }] },
-      { id: 'h3', name: '3학년', parts: [{ t: 'verb', level: 'high', n: 4 }, { t: 'grammar', levels: ['N2', 'N1'], n: 4 }, { t: 'kanji', grades: [8, 9], n: 2 }] },
-      { id: 'hf', name: '졸업 시험', boss: true, parts: [{ t: 'verb', level: 'high', n: 4 }, { t: 'grammar', levels: ['N2', 'N1'], n: 4 }, { t: 'kanji', grades: [7, 8, 9], n: 2 }] },
+      // 고등학교 한자: 새 한자 대신 특수 읽기(숙자훈) → 사자숙어 → 틀리기 쉬운 읽기
+      { id: 'h1', name: '1학년', parts: [{ t: 'hkanji', sets: ['jukuji'], n: 4 }, { t: 'verb', level: 'high', n: 3 }, { t: 'grammar', levels: ['N3'], n: 3 }] },
+      { id: 'h2', name: '2학년', parts: [{ t: 'hkanji', sets: ['yoji'], n: 4 }, { t: 'verb', level: 'high', n: 3 }, { t: 'grammar', levels: ['N2'], n: 3 }] },
+      { id: 'h3', name: '3학년', parts: [{ t: 'hkanji', sets: ['nandoku'], n: 4 }, { t: 'verb', level: 'high', n: 3 }, { t: 'grammar', levels: ['N2', 'N1'], n: 3 }] },
+      { id: 'hf', name: '졸업 시험', boss: true, parts: [{ t: 'hkanji', sets: ['jukuji', 'yoji', 'nandoku'], n: 4 }, { t: 'verb', level: 'high', n: 3 }, { t: 'grammar', levels: ['N2', 'N1'], n: 3 }] },
     ] },
 ]
 const STAGES = SCHOOLS.flatMap(s => s.stages.map(st => ({ ...st, school: s.id })))
@@ -97,8 +98,44 @@ const PASS = 8   // 10문제 중 8개 이상이면 통과
 function gradeName(g) { return g <= 6 ? `${g}학년` : `중${g - 6}` }
 function gradeLong(g) { return g <= 6 ? `초등 ${g}학년` : `중학 한자 (중${g - 6})` }
 
+// ───── 고등 한자: 숙자훈 · 사자숙어 · 틀리기 쉬운 읽기 ─────
+// 문제 키 "hk:yoji:12:r" (읽기 고르기), "hk:yoji:12:m" (뜻 고르기)
+const HK_SETS = { jukuji: '특수 읽기', yoji: '사자숙어', nandoku: '틀리기 쉬운 읽기' }
+function highKanjiKeys(sets) {
+  if (typeof HIGH_KANJI === 'undefined') return []
+  return sets.flatMap(s => (HIGH_KANJI[s] || []).flatMap((_, i) => [`hk:${s}:${i}:r`, `hk:${s}:${i}:m`]))
+}
+function makeHighKanjiQuestion(key) {
+  const [, s, i, type] = key.split(':')
+  const list = HIGH_KANJI[s]
+  const [w, r, m] = list[Number(i)]
+  const tag = ` <span class="gqlv">${HK_SETS[s]}</span>`
+  const review = `<span class="jp" lang="ja"><ruby>${w}<rt>${r}</rt></ruby></span><span class="dim">${m}</span>`
+  const right = `${w}(${r}) = ${m}`
+  if (type === 'r') {
+    const others = shuffle(list.map(e => e[1]).filter(x => x !== r && Math.abs(x.length - r.length) <= 2))
+    const misses = shuffle(nearMisses(r))
+    const picks = new Set([r])
+    if (misses[0]) picks.add(misses[0])
+    for (const x of others) { if (picks.size >= 4) break; picks.add(x) }
+    for (const x of misses) { if (picks.size >= 4) break; picks.add(x) }
+    return { key, review, right, wrong: right, mode: 'kanji',
+      head: wordCells(w), prompt: `읽는 법은 <span class="dim">· ${m}</span>${tag}`,
+      choices: shuffle([...picks].map(x => ({ html: x, ok: x === r }))) }
+  }
+  const others = shuffle([...new Set(list.map(e => e[2]).filter(x => x !== m))]).slice(0, 3)
+  return { key, review, right, wrong: right, mode: 'kanji',
+    head: wordCells(w), prompt: `뜻은 <span class="dim">· ${r}</span>${tag}`,
+    choices: shuffle([m, ...others].map(x => ({ html: x, ok: x === m, ko: true }))) }
+}
+
 function partQuestions(part, wrong) {
   let keys = [], make
+  if (part.t === 'hkanji') {
+    keys = highKanjiKeys(part.sets)
+    if (keys.length) return pickKeys(wrong.kanji, keys).slice(0, part.n).map(makeHighKanjiQuestion)
+    part = { t: 'kanji', grades: [7, 8, 9], n: part.n }   // 데이터가 없을 때
+  }
   if (part.t === 'kanji') {
     const maxGrade = Math.max(...part.grades)
     let pool = Object.keys(KANJI).filter(c => part.grades.includes(KANJI[c].grade))

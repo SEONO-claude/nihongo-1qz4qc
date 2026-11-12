@@ -321,7 +321,7 @@ function homeView() {
   const totalK = Object.keys(KANJI).length
   const date = new Date().toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })
   const wrong = progress.wrong.length + progress.wrongKanji.length + progress.wrongGrammar.length
-  const kanjiQ = Object.values(KANJI).reduce((n, k) => n + 1 + k.examples.length, 0)
+  const kanjiQ = Object.values(KANJI).reduce((n, k) => n + 1 + k.examples.length, 0) + highKanjiKeys(Object.keys(HK_SETS)).length
   const weekday = new Date().toLocaleDateString('ko-KR', { weekday: 'long' })
   const t = todayStats(), s = streak(), studiedToday = progress.studyDays.includes(todayStr())
   const nextSt = STAGES[currentStageIndex()]
