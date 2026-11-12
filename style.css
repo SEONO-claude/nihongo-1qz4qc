@@ -168,6 +168,12 @@ main { max-width: 640px; margin: 0 auto; padding: 28px 16px 96px; }
 .mean { text-align: center; font-family: var(--round); font-size: 22px; padding: 4px 20px 8px; }
 .mean span { display: inline-block; margin-top: 4px; padding: 2px 10px; border-radius: 999px; background: var(--acc-t); color: var(--acc-d); font-family: var(--sans); font-size: 13px; }
 .cardtabs button .num { margin-left: 4px; font-size: 12px; color: var(--ink-3); }
+/* 폰에서는 카드 종류 네 개를 한 줄에: 개수는 이름 아래로 */
+@media (max-width: 520px) {
+  .tabs.cardtabs { display: flex; flex-wrap: nowrap; width: 100%; }
+  .cardtabs button { flex: 1; min-width: 0; height: auto; padding: 6px 4px; display: flex; flex-direction: column; align-items: center; line-height: 1.25; font-size: 15px; white-space: nowrap; }
+  .cardtabs button .num { margin-left: 0; font-size: 11px; }
+}
 .adjtable { border-top: 2px solid var(--line); }
 .adjtable .end, .rule .end { color: var(--ink-3); }
 
