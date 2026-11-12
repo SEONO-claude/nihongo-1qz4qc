@@ -1,6 +1,6 @@
 // ───── 진도 저장 (localStorage) ─────
 const STORE_KEY = 'jp-study-progress'
-const EMPTY = { seen: {}, seenKanji: [], learnedForms: [], wrong: [], learnedKanji: [], wrongKanji: [], lastStudy: '', studyDays: [], today: { date: '', cards: 0, quizzes: 0, xp: 0 }, xp: 0, sound: true, music: true, savedGrammar: [], seenHigh: [], seenGrammar: [], learnedGrammar: [], wrongGrammar: [], stages: {}, graduated: [], badges: [], bestCombo: 0 }
+const EMPTY = { seen: {}, seenKanji: [], learnedForms: [], wrong: [], learnedKanji: [], wrongKanji: [], lastStudy: '', studyDays: [], today: { date: '', cards: 0, quizzes: 0, xp: 0 }, xp: 0, sound: true, music: true, savedGrammar: [], seenHigh: [], seenGrammar: [], learnedGrammar: [], wrongGrammar: [], stages: {}, graduated: [], badges: [], bestCombo: 0, musicVol: 1, sfxVol: 1 }
 
 function loadProgress() {
   try { return { ...EMPTY, ...JSON.parse(localStorage.getItem(STORE_KEY) || '{}') } }
@@ -47,8 +47,19 @@ function addXP(n, x, y) {
 // 아이폰은 Web Audio 소리를 무음 모드에서 막지만, 오디오 플레이어(<audio>) 소리는 무음 모드에서도 낸다.
 // 그래서 Web Audio는 쓰지 않는다. 효과음은 앱이 켜질 때 짧은 WAV 파일로 미리 만들어 두고 오디오 플레이어로 튼다.
 
+// 소리 조각(PCM) → WAV 파일. 아이폰 사파리는 재생 중 음량을 바꿀 수 없어서, 음량을 바꾸면 그 크기로 파일을 다시 만든다.
+function wavURL(pcm, rate, gain = 1) {
+  const len = pcm.length, buf = new ArrayBuffer(44 + len * 2), v = new DataView(buf)
+  const str = (o, s) => [...s].forEach((c, i) => v.setUint8(o + i, c.charCodeAt(0)))
+  str(0, 'RIFF'); v.setUint32(4, 36 + len * 2, true); str(8, 'WAVEfmt '); v.setUint32(16, 16, true)
+  v.setUint16(20, 1, true); v.setUint16(22, 1, true); v.setUint32(24, rate, true); v.setUint32(28, rate * 2, true)
+  v.setUint16(32, 2, true); v.setUint16(34, 16, true); str(36, 'data'); v.setUint32(40, len * 2, true)
+  for (let k = 0; k < len; k++) v.setInt16(44 + k * 2, Math.max(-1, Math.min(1, pcm[k] * gain)) * 32767, true)
+  return URL.createObjectURL(new Blob([buf], { type: 'audio/wav' }))
+}
+
 // 음 몇 개를 이어 붙인 짧은 소리를 WAV 파일로 만든다 (인터넷 필요 없음)
-function renderTone(freqs, { dur = 0.13, type = 'triangle', gap = 0.09, vol = 0.3 } = {}) {
+function renderTone(freqs, { dur = 0.13, type = 'triangle', gap = 0.09, vol = 0.3 } = {}, gain = 1) {
   const rate = 22050, len = Math.ceil(rate * ((freqs.length - 1) * gap + dur + 0.05))
   const pcm = new Float32Array(len)
   freqs.forEach((f, i) => {
@@ -60,13 +71,7 @@ function renderTone(freqs, { dur = 0.13, type = 'triangle', gap = 0.09, vol = 0.
       pcm[start + k] += wave * env * vol
     }
   })
-  const buf = new ArrayBuffer(44 + len * 2), v = new DataView(buf)
-  const str = (o, s) => [...s].forEach((c, i) => v.setUint8(o + i, c.charCodeAt(0)))
-  str(0, 'RIFF'); v.setUint32(4, 36 + len * 2, true); str(8, 'WAVEfmt '); v.setUint32(16, 16, true)
-  v.setUint16(20, 1, true); v.setUint16(22, 1, true); v.setUint32(24, rate, true); v.setUint32(28, rate * 2, true)
-  v.setUint16(32, 2, true); v.setUint16(34, 16, true); str(36, 'data'); v.setUint32(40, len * 2, true)
-  for (let k = 0; k < len; k++) v.setInt16(44 + k * 2, Math.max(-1, Math.min(1, pcm[k])) * 32767, true)
-  return URL.createObjectURL(new Blob([buf], { type: 'audio/wav' }))
+  return wavURL(pcm, rate, gain)
 }
 
 const SFX_DEF = {
@@ -79,7 +84,12 @@ const SFX_DEF = {
   open: [[392, 523, 659, 784, 1047, 1319], { gap: 0.075, dur: 0.26, vol: 0.26 }],
 }
 const SFX_URL = {}
-try { for (const [name, [f, o]] of Object.entries(SFX_DEF)) SFX_URL[name] = renderTone(f, o) } catch { /* 소리 없이 */ }
+// 효과음 음량을 바꾸면 모든 효과음을 그 크기로 다시 만든다
+function buildSfx() {
+  for (const u of Object.values(SFX_URL)) URL.revokeObjectURL(u)
+  try { for (const [name, [f, o]] of Object.entries(SFX_DEF)) SFX_URL[name] = renderTone(f, o, progress.sfxVol ?? 1) } catch { /* 소리 없이 */ }
+}
+buildSfx()
 
 function playSfx(name) {
   if (!progress.sound || !SFX_URL[name]) return
@@ -92,24 +102,57 @@ function playSfx(name) {
 const SFX = Object.fromEntries(Object.keys(SFX_DEF).map(n => [n, () => playSfx(n)]))
 
 // 배경음악: 파일 자체를 작게(-26 LUFS) 만들어 두었으므로 오디오 플레이어로 바로 튼다
-let bgm = null, bgmURL = null
+// 처음에는 mp3를 그대로 쓰고(풀기 전), 다 풀리면 음량을 곱한 WAV로 바꾼다.
+// 푸는 일(OfflineAudioContext)은 소리를 내지 않으므로 무음 모드와 상관없다.
+let bgm = null, bgmURL = null, bgmRawURL = null, bgmPCM = null, bgmRate = 22050
 ;(function preloadBgm() {
+  const ready = blob => {
+    bgmRawURL = bgmURL = URL.createObjectURL(blob)
+    blob.arrayBuffer().then(decodeBgm).catch(() => {})
+  }
   // 한 파일로 묶은 페이지(claude.ai 링크)에는 음악이 글자로 들어 있어 직접 풀어 쓴다
   if (window.APP_AUDIO) {
     try {
       const bin = atob(window.APP_AUDIO.split(',')[1]), bytes = new Uint8Array(bin.length)
       for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
-      bgmURL = URL.createObjectURL(new Blob([bytes], { type: 'audio/mpeg' }))
+      ready(new Blob([bytes], { type: 'audio/mpeg' }))
     } catch { /* 음악 없이 */ }
     return
   }
-  fetch('audio/bgm.mp3').then(r => r.ok ? r.blob() : null).then(b => { if (b) bgmURL = URL.createObjectURL(b) }).catch(() => {})
+  fetch('audio/bgm.mp3').then(r => r.ok ? r.blob() : null).then(b => { if (b) ready(b) }).catch(() => {})
 })()
+async function decodeBgm(arrayBuf) {
+  try {
+    const AC = window.OfflineAudioContext || window.webkitOfflineAudioContext
+    if (!AC) return
+    const ctx = new AC(1, 1, 22050)
+    const audio = await new Promise((res, rej) => { const p = ctx.decodeAudioData(arrayBuf, res, rej); if (p && p.then) p.then(res, rej) })
+    const n = audio.length, ch = audio.numberOfChannels, mono = new Float32Array(n)
+    for (let c = 0; c < ch; c++) { const d = audio.getChannelData(c); for (let i = 0; i < n; i++) mono[i] += d[i] / ch }
+    bgmPCM = mono; bgmRate = audio.sampleRate
+    rebuildBgm()
+  } catch { /* 풀 수 없으면 mp3 그대로 (음량은 기기에 따라) */ }
+}
+// 음량에 맞는 음악 파일로 바꾸고, 듣던 곳에서 이어서 튼다
+function rebuildBgm() {
+  const vol = progress.musicVol ?? 1
+  if (bgmPCM) {
+    if (bgmURL && bgmURL !== bgmRawURL) URL.revokeObjectURL(bgmURL)
+    bgmURL = wavURL(bgmPCM, bgmRate, vol)
+  }
+  if (!bgm) return
+  try { bgm.volume = bgmPCM ? 1 : vol } catch { /* 아이폰은 읽기 전용 */ }
+  if (bgm.src === bgmURL) return
+  const t = bgm.currentTime || 0, playing = !bgm.paused
+  bgm.src = bgmURL
+  bgm.addEventListener('loadedmetadata', () => { try { bgm.currentTime = t % (bgm.duration || 1e9) } catch { /* 처음부터 */ } }, { once: true })
+  if (playing) bgm.play().catch(() => {})
+}
 
 function playBgm() {
   if (!bgmURL || !progress.music) return
   try {
-    if (!bgm) { bgm = new Audio(bgmURL); bgm.loop = true; bgm.setAttribute('playsinline', '') }
+    if (!bgm) { bgm = new Audio(bgmURL); bgm.loop = true; bgm.setAttribute('playsinline', ''); try { bgm.volume = bgmPCM ? 1 : (progress.musicVol ?? 1) } catch { /* 아이폰 */ } }
     bgm.play().catch(() => {})
   } catch { /* 소리를 낼 수 없는 기기 */ }
 }
@@ -304,13 +347,13 @@ function updateTop() {
   const s = document.getElementById('soundbtn')
   if (s) {
     s.innerHTML = `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="${ICONS[progress.sound ? 'sound' : 'mute']}"/></svg>`
-    s.setAttribute('aria-label', progress.sound ? '효과음 끄기' : '효과음 켜기')
+    s.setAttribute('aria-label', '소리 설정 (효과음)')
     s.classList.toggle('off', !progress.sound)
   }
   const m = document.getElementById('musicbtn')
   if (m) {
     m.innerHTML = `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="${ICONS[progress.music ? 'music' : 'musicOff']}"/></svg>`
-    m.setAttribute('aria-label', progress.music ? '배경음악 끄기' : '배경음악 켜기')
+    m.setAttribute('aria-label', '소리 설정 (배경음악)')
     m.classList.toggle('off', !progress.music)
   }
 }
@@ -988,13 +1031,8 @@ function startStage(id) {
 const ACTIONS = {
   prevCard() { state.cardIdx[state.cardType]--; state.kanji = null; state.slide = 'prev'; markSeen(); SFX.tap() },
   nextCard() { state.cardIdx[state.cardType]++; state.kanji = null; state.slide = 'next'; markSeen(); SFX.tap() },
-  sound() { progress.sound = !progress.sound; saveProgress(); updateTop(); startAudio(); SFX.tap(); return true },
-  music() {
-    progress.music = !progress.music; saveProgress(); updateTop()
-    if (!progress.music) stopBgm()
-    startAudio()   // 음악을 꺼도 효과음이 무음 모드에서 나도록 소리 없는 오디오를 이어서 튼다
-    return true
-  },
+  sound() { toggleSoundPanel(); return true },
+  music() { toggleSoundPanel(); return true },
   grammarLevel(btn) { state.grammarLevel = btn.dataset.level; state.grammarOpen = null },
   startStage(btn) { startStage(btn.dataset.id); return true },
   questContinue() { startStage(STAGES[currentStageIndex()].id); return true },
@@ -1127,6 +1165,74 @@ document.addEventListener('change', e => {
 
 // ───── 오프라인 (홈 화면에 추가해서 쓸 때) ─────
 let offlineReady = false
+
+// ───── 소리 설정: 배경음악·효과음 음량을 따로 ─────
+const VOL_ICON = {
+  music: on => ICONS[on ? 'music' : 'musicOff'],
+  sfx: on => ICONS[on ? 'sound' : 'mute'],
+}
+function volNow(kind) { return kind === 'music' ? (progress.music ? progress.musicVol ?? 1 : 0) : (progress.sound ? progress.sfxVol ?? 1 : 0) }
+function volRow(kind, label) {
+  const v = Math.round(volNow(kind) * 100)
+  return `<div class="sp-row" data-kind="${kind}">
+    <button class="sp-mute" data-mute="${kind}" aria-label="${label} ${v ? '끄기' : '켜기'}"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="${VOL_ICON[kind](v > 0)}"/></svg></button>
+    <label class="sp-name" for="vol-${kind}">${label}</label>
+    <input id="vol-${kind}" type="range" min="0" max="100" step="5" value="${v}" style="--v:${v}%">
+    <span class="sp-val num">${v}</span></div>`
+}
+function setVol(kind, v, done) {
+  const on = v > 0
+  if (kind === 'music') { if (on) progress.musicVol = v; progress.music = on }
+  else { if (on) progress.sfxVol = v; progress.sound = on }
+  updateTop()
+  if (!done) return
+  saveProgress()
+  if (kind === 'music') { if (on) { rebuildBgm(); playBgm() } else stopBgm() }
+  else if (on) { buildSfx(); SFX.good() }
+}
+function toggleSoundPanel() {
+  const old = document.getElementById('soundpanel')
+  if (old) { old.remove(); return }
+  const el = document.createElement('div')
+  el.id = 'soundpanel'
+  el.className = 'soundpanel'
+  el.setAttribute('role', 'dialog')
+  el.setAttribute('aria-label', '소리 설정')
+  const draw = () => {
+    el.innerHTML = `<div class="sp-head"><b>소리 설정</b><button class="sp-close" data-close aria-label="닫기"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12 M18 6 6 18"/></svg></button></div>
+      ${volRow('music', '배경음악')}${volRow('sfx', '효과음')}
+      <p class="sp-note">0으로 내리면 꺼져요 · 전체 크기는 폰 음량 버튼으로</p>`
+  }
+  draw()
+  el.addEventListener('input', e => {
+    const r = e.target.closest('input[type=range]'); if (!r) return
+    const row = r.closest('.sp-row'), v = Number(r.value)
+    row.querySelector('.sp-val').textContent = v
+    r.style.setProperty('--v', v + '%')
+    setVol(row.dataset.kind, v / 100, false)
+    row.querySelector('.sp-mute path').setAttribute('d', VOL_ICON[row.dataset.kind](v > 0))
+  })
+  el.addEventListener('change', e => {
+    const r = e.target.closest('input[type=range]'); if (!r) return
+    setVol(r.closest('.sp-row').dataset.kind, Number(r.value) / 100, true)
+  })
+  el.addEventListener('click', e => {
+    e.stopPropagation()
+    if (e.target.closest('[data-close]')) { el.remove(); return }
+    const m = e.target.closest('[data-mute]')
+    if (m) {
+      const kind = m.dataset.mute
+      setVol(kind, volNow(kind) > 0 ? 0 : (kind === 'music' ? progress.musicVol : progress.sfxVol) || 0.6, true)
+      draw()
+    }
+  })
+  document.body.appendChild(el)
+}
+// 창 밖을 누르면 닫는다
+document.addEventListener('click', e => {
+  const p = document.getElementById('soundpanel')
+  if (p && !p.contains(e.target) && !e.target.closest('.soundbtn')) p.remove()
+}, true)
 
 // ───── 오프닝: 앱을 켤 때 한 번 ─────
 // 연습장 칸이 튀어나오고 → 안내선이 그어지고 → 미케가 올라오고 → 日 도장이 쾅 → 제목이 한 글자씩
