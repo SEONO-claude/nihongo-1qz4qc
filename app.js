@@ -23,7 +23,7 @@ const progress = loadProgress()
 // 오늘 한 공부 (날짜가 바뀌면 0부터)
 function todayStats() {
   if (progress.today.date !== todayStr()) progress.today = { date: todayStr(), cards: 0, quizzes: 0, xp: 0 }
-  for (const k of ['xp', 'correct', 'listen', 'reviews', 'stages', 'grammar']) if (progress.today[k] === undefined) progress.today[k] = 0
+  for (const k of ['xp', 'correct', 'scenes', 'reviews', 'stages', 'grammar']) if (progress.today[k] === undefined) progress.today[k] = 0
   return progress.today
 }
 function bumpToday(key) { todayStats()[key]++; saveProgress() }
@@ -752,7 +752,7 @@ function cardsView() {
     ${type === 'adj' ? adjTable(w) : ''}
     ${type === 'ono' ? `<div class="onobox"><div class="onouse"><b>자주 쓰는 꼴</b><span lang="ja">${furi(w.use)}</span></div>
       <div class="onoex"><span class="jp" lang="ja">${gMark(w.example.jp)}</span><span class="ko">${w.example.ko}</span>
-      <button class="tspeak" data-act="speakOno" data-id="${w.id}" aria-label="읽어 주기">${SPEAK_ICON}</button></div>
+</div>
       <p class="onowhen">${w.when}</p></div>` : ''}
     ${state.kanji ? kanjiInfo(state.kanji) : ''}
     <div class="actions">
@@ -911,7 +911,7 @@ const MISSIONS = [
   { id: 'quiz2', label: '퀴즈 두 번 끝내기', need: 2, get: t => t.quizzes, c: 'var(--sun)' },
   { id: 'correct15', label: '정답 15개 맞히기', need: 15, get: t => t.correct, c: 'var(--leaf)' },
   { id: 'correct30', label: '정답 30개 맞히기', need: 30, get: t => t.correct, c: 'var(--leaf)' },
-  { id: 'listen5', label: '일본어 읽어 주기 5번 듣기', need: 5, get: t => t.listen, c: 'var(--mint)' },
+  { id: 'scene1', label: '회화 장면 하나 열어 보기', need: 1, get: t => t.scenes || 0, c: 'var(--mint)' },
   { id: 'grammar3', label: '문법 3개 펼쳐 보기', need: 3, get: t => t.grammar, c: 'var(--mint)' },
   { id: 'stage1', label: '퀘스트 한 칸 통과하기', need: 1, get: t => t.stages, c: 'var(--pink)' },
   { id: 'review1', label: '오늘 복습 끝내기', need: 1, get: t => t.reviews, c: 'var(--pink)', when: () => Object.keys(progress.review || {}).length > 0 },
@@ -1022,22 +1022,10 @@ async function showReportCard(schoolId) {
 }
 
 // ───── 실생활 회화 ─────
-// 일본어 읽어 주기: 폰에 들어 있는 일본어 음성 (인터넷 필요 없음)
-function speakJa(furiText) {
-  try {
-    if (!progress.sound || !window.speechSynthesis) return
-    const text = furiText.replace(/\{([^{}|]+)\|[^{}|]+\}/g, '$1')
-    const u = new SpeechSynthesisUtterance(text)
-    u.lang = 'ja-JP'; u.rate = 0.9
-    const v = speechSynthesis.getVoices().find(x => /^ja/i.test(x.lang))
-    if (v) u.voice = v
-    u.volume = Math.max(0.2, progress.sfxVol ?? 1)
-    speechSynthesis.cancel(); speechSynthesis.speak(u)
-  } catch { /* 읽어 줄 수 없는 기기 */ }
-}
 function talkLineOf(key) { const [, sid, i] = key.split(':'); const s = talkScene(sid); return s && s.lines[Number(i)] }
-function talkSeenCount(s) { return s.lines.filter((_, i) => progress.talkSeen.includes(`${s.id}:${i}`)).length }
-const SPEAK_ICON = '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4V5Z M15.5 8.5a5 5 0 0 1 0 7"/></svg>'
+// 문장 하나라도 퀴즈에서 맞히면 '익힘'
+function talkLearned(sid, i) { return ['tw', 'tm', 'tb'].some(t => progress.learnedTalk.includes(`${t}:${sid}:${i}`)) }
+function talkSeenCount(s) { return s.lines.filter((_, i) => talkLearned(s.id, i)).length }
 
 function talkView() {
   const scenes = typeof TALK === 'undefined' ? [] : TALK
@@ -1061,14 +1049,13 @@ function talkView() {
   const s = talkScene(state.talkScene), st = progress.talkStamps[s.id]
   const lines = s.lines.map((l, i) => {
     const jp = state.showCasual && l.casual ? l.casual : l.jp
-    const seen = progress.talkSeen.includes(`${s.id}:${i}`)
+    const seen = talkLearned(s.id, i)
     return `<div class="tline ${l.who}${seen ? ' seen' : ''}">
       <div class="twho">${l.who === 'me' ? '나' : '상대'} · ${l.when}</div>
       <div class="tbubble">
         <span class="jp" lang="ja">${furi(jp)}</span>
         <span class="ko">${l.ko}</span>
         ${l.note ? `<span class="tnote">${l.note}</span>` : ''}
-        <button class="tspeak" data-act="speak" data-scene="${s.id}" data-i="${i}" aria-label="읽어 주기">${SPEAK_ICON}</button>
       </div></div>`
   }).join('')
   return `
@@ -1076,7 +1063,7 @@ function talkView() {
     <span class="tmark" lang="ja">${s.mark}</span><div><b>${s.name}</b><small>${s.desc}</small></div>${st ? '<span class="tdone" lang="ja">済</span>' : ''}</div>
   <div class="subbar"><button class="btn${state.showCasual ? ' on' : ''}" data-act="talkCasual">${state.showCasual ? '존댓말로 보기' : '반말로 보기'}</button><button class="btn pri" data-act="talkQuiz">${st ? '장면 퀴즈 다시' : '장면 퀴즈 · 도장 받기'}</button></div>
   <div class="panel tlines">${lines}</div>
-  <p class="locknote">스피커를 누르면 일본어로 읽어 줘요 · 무음 모드에서는 소리가 안 날 수 있어요</p>`
+  <p class="locknote">퀴즈에서 맞힌 문장에는 '익힘'이 표시돼요</p>`
 }
 
 // ───── 퀘스트 지도 ─────
@@ -1330,9 +1317,6 @@ function pick(i) {
   }
   saveProgress()
   render()
-  // 답한 뒤 정답 읽어 주기는 소리 설정에서 켠 사람만 (기본은 끔)
-  if (progress.autoSpeak && m === 'talk') { const l = talkLineOf(q.key); if (l) setTimeout(() => speakJa(l.jp), 350) }
-  if (progress.autoSpeak && m === 'ono') { const o = onoById(q.key.split(':')[1]); if (o) setTimeout(() => speakJa(o.word), 350) }
   if (ok) {
     const gain = qz.combo >= 3 ? 15 : 10
     qz.xp += gain
@@ -1461,23 +1445,10 @@ const ACTIONS = {
   },
   reportCard(btn) { showReportCard(btn.dataset.school); return true },
   onoQuiz() { const w = cardList()[cardIndex()]; state.quizMode = 'ono'; state.onoQuiz = w ? w.cat : 'all'; state.quizTab = 'free'; go('quiz'); return true },
-  speakOno(btn) { todayStats().listen++; saveProgress(); const o = onoById(btn.dataset.id); if (o) speakJa(o.example.jp.replace(/［|］/g, '')); btn.classList.add('on'); setTimeout(() => btn.classList.remove('on'), 900); return true },
-  talkOpen(btn) { state.talkScene = btn.dataset.id; SFX.tap(); window.scrollTo(0, 0) },
+  talkOpen(btn) { state.talkScene = btn.dataset.id; todayStats().scenes = (todayStats().scenes || 0) + 1; saveProgress(); SFX.tap(); window.scrollTo(0, 0) },
   talkBack() { state.talkScene = null; window.scrollTo(0, 0) },
   talkCasual() { state.showCasual = !state.showCasual; SFX.tap() },
   talkQuiz() { state.quizMode = 'talk'; state.talkQuiz = state.talkScene || 'all'; state.quizTab = 'free'; go('quiz'); return true },
-  speak(btn) {
-    const s = talkScene(btn.dataset.scene), l = s && s.lines[Number(btn.dataset.i)]
-    if (!l) return true
-    speakJa(state.showCasual && l.casual ? l.casual : l.jp)
-    const k = `${s.id}:${btn.dataset.i}`
-    todayStats().listen++
-    if (!progress.talkSeen.includes(k)) { progress.talkSeen.push(k); addXP(1) }
-    saveProgress()
-    btn.classList.add('on'); setTimeout(() => btn.classList.remove('on'), 900)
-    btn.closest('.tline')?.classList.add('seen')
-    return true
-  },
   place(btn) { const qz = state.quiz; if (qz.picked !== null) return true; qz.built.push(Number(btn.dataset.p)); SFX.tap() },
   unplace(btn) { const qz = state.quiz; if (qz.picked !== null) return true; qz.built.splice(Number(btn.dataset.k), 1); SFX.tap() },
   checkOrder() {
@@ -1606,7 +1577,6 @@ function toggleSoundPanel() {
         <button class="sp-next" data-skip aria-label="다음 곡"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5l9 7-9 7z M18 5v14"/></svg></button></div>
         <p class="sp-now">지금 · <b id="nowplaying">${trackNow >= 0 ? TRACKS[trackNow].name : ''}</b></p>` : ''}
       ${volRow('sfx', '효과음')}
-      <label class="sp-auto"><input type="checkbox" id="autospeak" ${progress.autoSpeak ? 'checked' : ''}><span>회화·의성어 문제를 풀면 정답을 일본어로 읽어 주기</span></label>
       <p class="sp-note">0으로 내리면 꺼져요 · 전체 크기는 폰 음량 버튼으로</p>`
   }
   draw()
@@ -1619,7 +1589,6 @@ function toggleSoundPanel() {
     row.querySelector('.sp-mute path').setAttribute('d', VOL_ICON[row.dataset.kind](v > 0))
   })
   el.addEventListener('change', e => {
-    if (e.target.id === 'autospeak') { progress.autoSpeak = e.target.checked; saveProgress(); if (progress.autoSpeak) speakJa('はい'); return }
     if (e.target.id === 'tracksel') { chooseTrack(e.target.value === 'all' ? 'all' : Number(e.target.value)); return }
     const r = e.target.closest('input[type=range]'); if (!r) return
     setVol(r.closest('.sp-row').dataset.kind, Number(r.value) / 100, true)
