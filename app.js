@@ -604,11 +604,10 @@ function quizView() {
     let cls = 'choice'
     if (answered && c.ok) cls += ' ok'
     else if (answered && i === qz.picked) cls += ' miss'
-    // 긴 보기(気をつけませんでした 등)는 글자를 줄여 한 줄에 넣는다
-    const len = c.html.replace(/<rt>.*?<\/rt>/g, '').replace(/<[^>]+>/g, '').length
-    if (len >= 9) cls += ' long'
-    if (len >= 11) cls += ' xlong'
-    return `<button class="${cls}" data-pick="${i}" ${c.ko ? '' : 'lang="ja"'} ${answered ? 'disabled' : ''}>${c.html}${answered && c.ok ? maruSVG() : ''}</button>`
+    // 글자 수에 맞춰 크기를 정해 항상 한 줄에 들어가게 한다 (폰 보기 칸 안쪽 폭 약 148px)
+    const len = [...c.html.replace(/<rt>.*?<\/rt>/g, '').replace(/<[^>]+>/g, '')].length
+    const fs = Math.max(12, Math.min(20, Math.floor((c.ko ? 160 : 148) / Math.max(len, 1))))
+    return `<button class="${cls}" data-pick="${i}" style="--fs:${fs}px" ${c.ko ? '' : 'lang="ja"'} ${answered ? 'disabled' : ''}>${c.html}${answered && c.ok ? maruSVG() : ''}</button>`
   }).join('')
   const mood = !answered ? 'think' : ok ? 'cheer' : 'sad'
   const say = !answered ? q.prompt : ok ? qz.say : qz.say
