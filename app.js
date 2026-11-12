@@ -76,6 +76,7 @@ const SFX_DEF = {
   done: [[523, 659, 784, 1047, 1319], { gap: 0.09, dur: 0.22 }],
   tap: [[523], { dur: 0.05, vol: 0.12, type: 'sine' }],
   stamp: [[110, 82], { type: 'sine', gap: 0.05, dur: 0.2, vol: 0.5 }],
+  open: [[392, 523, 659, 784, 1047, 1319], { gap: 0.075, dur: 0.26, vol: 0.26 }],
 }
 const SFX_URL = {}
 try { for (const [name, [f, o]] of Object.entries(SFX_DEF)) SFX_URL[name] = renderTone(f, o) } catch { /* 소리 없이 */ }
@@ -1127,11 +1128,53 @@ document.addEventListener('change', e => {
 // ───── 오프라인 (홈 화면에 추가해서 쓸 때) ─────
 let offlineReady = false
 
+// ───── 오프닝: 앱을 켤 때 한 번 ─────
+// 연습장 칸이 튀어나오고 → 안내선이 그어지고 → 미케가 올라오고 → 日 도장이 쾅 → 제목이 한 글자씩
+// 아이폰은 화면을 눌러야 소리가 나므로, "눌러서 시작"을 누를 때 팡파르와 배경음악이 함께 시작된다
+function showOpening() {
+  try { if (sessionStorage.getItem('opened')) return } catch { /* 저장 못 하면 매번 보여 준다 */ }
+  const reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches
+  const s = streak()
+  const title = '일본어 첫걸음'
+  const el = document.createElement('div')
+  el.id = 'opening'
+  el.setAttribute('role', 'dialog')
+  el.setAttribute('aria-label', '일본어 첫걸음 시작 화면')
+  el.innerHTML = `
+    <div class="op-petals" aria-hidden="true">${Array.from({ length: 16 }, (_, i) => `<i style="--l:${(i * 37) % 100}%;--d:${((i * 0.43) % 3).toFixed(2)}s;--t:${5 + (i % 5)}s;--s:${9 + (i % 4) * 3}px;--c:${PETAL_COLORS[i % 3]}"></i>`).join('')}</div>
+    <div class="op-cell">
+      <div class="op-inner">
+        <svg class="op-guide" viewBox="0 0 100 100" aria-hidden="true"><path d="M50 4V96" pathLength="1"/><path d="M4 50H96" pathLength="1"/></svg>
+        <img class="op-mascot" src="${IMAGES.mascot}" alt="" width="320" height="320">
+      </div>
+      <span class="op-hanko" lang="ja">日</span>
+    </div>
+    <h1 class="op-title">${[...title].map((c, i) => c === ' ' ? '<span class="sp"> </span>' : `<span style="--i:${i}">${c}</span>`).join('')}</h1>
+    <p class="op-sub"><span class="lvchip"><b class="num">Lv.${playerLevel()}</b>${rankName()}</span>${s >= 2 ? `<span class="op-streak">${s}일 연속</span>` : ''}</p>
+    <button class="btn pri op-start">눌러서 시작</button>`
+  document.body.appendChild(el)
+  document.documentElement.classList.add('opening')
+  // 도장이 찍히는 순간 꽃잎이 터진다
+  setTimeout(() => { const h = el.querySelector('.op-hanko'); if (h && el.isConnected) { const [x, y] = centerOf(h); confetti(x, y, 30) } }, reduce ? 0 : 1080)
+  const close = () => {
+    if (el.classList.contains('out')) return
+    el.classList.add('out')
+    SFX.open()
+    try { sessionStorage.setItem('opened', '1') } catch { /* 무시 */ }
+    confetti(innerWidth / 2, innerHeight * 0.45, 46)
+    setTimeout(() => { el.remove(); document.documentElement.classList.remove('opening') }, 560)
+  }
+  el.addEventListener('click', close)
+  el.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); close() } })
+  el.querySelector('.op-start').focus({ preventScroll: true })
+}
+
 // 예전 기록으로 이미 딴 배지는 조용히 채워 둔다
 checkBadges(); saveProgress()
 
 // 화면을 먼저 그린다. 오프라인 준비가 실패해도 앱은 열려야 한다.
 render()
+showOpening()
 
 // claude.ai 미리보기처럼 막힌 곳에서는 serviceWorker를 읽기만 해도 오류가 나므로 전부 try 안에서 한다
 try {
