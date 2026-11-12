@@ -319,7 +319,7 @@ function newQuiz() {
     : state.quizMode === 'kanji' ? buildKanjiQuiz(state.quizGrade, progress.wrongKanji)
     : state.quizMode === 'grammar' ? buildGrammarQuiz(state.quizLevel, progress.savedGrammar, progress.wrongGrammar)
     : buildVerbQuiz(progress.wrong, state.verbQuizLevel)
-  state.quiz = { list, i: 0, picked: null, right: 0, missed: [], combo: 0, best: 0, xp: 0 }
+  state.quiz = { list, i: 0, picked: null, right: 0, missed: [], combo: 0, best: 0, xp: 0, built: [] }
 }
 
 // lucide 아이콘 (16px, 선 1.5)
@@ -538,7 +538,7 @@ function homeView() {
     ${bar('맞힌 동사 형태', progress.learnedForms.length, formTotal)}
     ${bar('맞힌 한자 문제', progress.learnedKanji.length, kanjiQ)}
     ${bar('본 JLPT 문법', progress.seenGrammar.filter(id => GRAMMAR.some(g => g.id === id)).length, GRAMMAR.length)}
-    ${bar('맞힌 문법 문제', progress.learnedGrammar.length, GRAMMAR.reduce((n, g) => n + 2 + g.examples.length, 0))}
+    ${bar('맞힌 문법 문제', progress.learnedGrammar.length, GRAMMAR.reduce((n, g) => n + grammarKeys(g).length, 0))}
     <div class="row"><div class="label">다시 볼 문제<span class="num${wrong ? ' key' : ''}">${wrong}개</span></div></div>
   </div>
   ${offlineReady ? '<p class="sub offline">인터넷 없이도 열 수 있어요</p>' : ''}`
@@ -843,12 +843,13 @@ function grammarView() {
     const open = l === 'saved' || isOpen('grammar', l)
     return `<button class="${lv === l ? 'on' : ''}${open ? '' : ' locked'}" data-act="grammarLevel" data-level="${l}">${open ? '' : LOCK}${l === 'saved' ? '★ 저장' : l}<span class="num">${n}</span></button>`
   }).join('')
-  const ghero = `<div class="ghero">${mascot('mascot')}<div><h1>JLPT 문법</h1><p>N5 기초부터 N1 핵심까지 · 헷갈리는 건 저장해 두고 다시 봐요</p></div></div>`
+  const ghero = `<div class="ghero">${mascot('mascot')}<div><h1>JLPT 문법</h1><p>주제별로 묶어 보고, 헷갈리는 짝까지 한 번에 · 어려운 건 ☆로 모아 두기</p></div></div>`
   if (lv !== 'saved' && !isOpen('grammar', lv)) return ghero + `<div class="tabs gtabs">${tabs}</div>` + lockedPanel(`${lv} 문법 ${GRAMMAR.filter(g => g.level === lv).length}개`, unlockHint('grammar', lv))
   const list = lv === 'saved' ? GRAMMAR.filter(g => saved.includes(g.id)) : GRAMMAR.filter(g => g.level === lv)
   const seen = list.filter(g => progress.seenGrammar.includes(g.id)).length
-  const items = list.map(g => {
+  const item = g => {
     const open = state.grammarOpen === g.id, star = saved.includes(g.id)
+    const sim = (g.similar || []).map(id => GRAMMAR.find(x => x.id === id)).filter(Boolean)
     return `<div class="gitem${open ? ' open' : ''}${progress.seenGrammar.includes(g.id) ? ' seen' : ''}">
       <button class="ghead" data-act="grammarOpen" data-id="${g.id}" aria-expanded="${open}">
         <span class="gpattern" lang="ja">${furi(g.pattern)}</span>
@@ -858,11 +859,22 @@ function grammarView() {
       ${open ? `<div class="gbody">
         <div class="gconnect"><b>접속</b>${g.connect}</div>
         <p class="gexplain">${g.explain}</p>
-        ${g.examples.map(e => `<div class="gex"><span class="jp" lang="ja">${furi(e.jp)}</span><span class="ko">${e.ko}</span></div>`).join('')}
+        ${g.examples.map(e => `<div class="gex"><span class="jp" lang="ja">${gMark(e.jp)}</span><span class="ko">${e.ko}</span></div>`).join('')}
+        ${sim.length ? `<div class="gsim"><b>헷갈리는 짝</b><div class="gsimlist">${sim.map(x => `<button class="gsimbtn" data-act="grammarJump" data-id="${x.id}"><span lang="ja">${furi(x.pattern)}</span><small>${x.level} · ${x.meaning}</small></button>`).join('')}</div>${g.diff ? `<p>${g.diff}</p>` : ''}</div>` : ''}
         <button class="btn gstar${star ? ' on' : ''}" data-act="grammarStar" data-id="${g.id}">${star ? '★ 저장됨' : '☆ 헷갈려요, 저장'}</button>
       </div>` : ''}
     </div>`
-  }).join('')
+  }
+  // 급수 화면은 주제별로 묶는다 (주제가 없는 옛 데이터는 한 묶음)
+  const THEME_ORDER = ['기본 문장', '조사', '지시·존재', '활용', '시간·순서', '이유·원인', '목적·수단', '조건·가정', '역접·양보', '추측·전달', '의지·계획', '의무·허가·금지', '희망·권유·부탁', '변화·경험·시도', '비교·정도', '한정·강조', '주고받기', '경어', '상황·관점', '나열·예시']
+  let items
+  if (lv === 'saved' || !list.some(g => g.theme)) items = list.map(item).join('')
+  else {
+    const groups = THEME_ORDER.map(t => [t, list.filter(g => g.theme === t)]).filter(([, a]) => a.length)
+    const rest = list.filter(g => !THEME_ORDER.includes(g.theme))
+    if (rest.length) groups.push(['기타', rest])
+    items = groups.map(([t, a]) => `<div class="gtheme"><b>${t}</b><span class="num">${a.filter(g => progress.seenGrammar.includes(g.id)).length} / ${a.length}</span></div>${a.map(item).join('')}`).join('')
+  }
   const empty = lv === 'saved' && !list.length
     ? `<div class="gempty">${mascot('think')}<p>헷갈리는 문법에서 <b>☆ 저장</b>을 누르면 여기에 모여요</p></div>` : ''
   return `
@@ -1014,6 +1026,17 @@ function quizView() {
     const fs = Math.max(12, Math.min(20, Math.floor((c.ko ? 160 : 148) / Math.max(len, 1))))
     return `<button class="${cls}" data-pick="${i}" style="--fs:${fs}px" ${c.ko ? '' : 'lang="ja"'} ${answered ? 'disabled' : ''}>${c.html}${answered && c.ok ? maruSVG() : ''}</button>`
   }).join('')
+  // 문장 배열: 아래 조각을 눌러 위 줄에 차례로 놓고, 놓은 조각을 누르면 되돌린다
+  let body = `<div class="choices">${buttons}</div>`
+  if (q.order) {
+    const built = qz.built || (qz.built = [])
+    const placed = built.map((pi, k) => `<button class="opiece" data-act="unplace" data-k="${k}" lang="ja" ${answered ? 'disabled' : ''}>${q.order.parts[pi]}</button>`).join('')
+    const pool = q.order.mix.map(pi => built.includes(pi) ? `<span class="opiece ghost" aria-hidden="true">${q.order.parts[pi]}</span>`
+      : `<button class="opiece" data-act="place" data-p="${pi}" lang="ja" ${answered ? 'disabled' : ''}>${q.order.parts[pi]}</button>`).join('')
+    body = `<div class="oline${answered ? (ok ? ' ok' : ' miss') : ''}">${placed || '<span class="ohint">아래 조각을 눌러 여기에 차례로 놓아요</span>'}</div>
+      ${answered ? '' : `<div class="opool">${pool}</div>`}
+      ${answered ? '' : `<button class="btn pri ocheck" data-act="checkOrder" ${built.length === q.order.parts.length ? '' : 'disabled'}>확인</button>`}`
+  }
   const mood = !answered ? 'think' : ok ? 'cheer' : 'sad'
   const say = !answered ? q.prompt : ok ? qz.say : qz.say
   const last = qz.i === qz.list.length - 1
@@ -1029,7 +1052,7 @@ function quizView() {
   <div class="panel qcard">
     <div class="qhead">${mascot(mood)}<div class="bubble" ${answered ? '' : 'aria-live="polite"'}>${say}</div></div>
     <div class="q">${q.head}</div>
-    <div class="choices">${buttons}</div>
+    ${body}
     ${sheet}
   </div>`
 }
@@ -1129,6 +1152,17 @@ const ACTIONS = {
     if (state.grammarOpen && !progress.seenGrammar.includes(id)) { progress.seenGrammar.push(id); addXP(2) }
     SFX.tap()
   },
+  grammarJump(btn) {
+    const g = GRAMMAR.find(x => x.id === btn.dataset.id)
+    if (!g || !isOpen('grammar', g.level)) { SFX.bad(); return true }
+    state.grammarLevel = g.level; state.grammarOpen = g.id
+    if (!progress.seenGrammar.includes(g.id)) { progress.seenGrammar.push(g.id); addXP(2) }
+    render()
+    const el = document.querySelector(`[data-act="grammarOpen"][data-id="${g.id}"]`)
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    SFX.tap()
+    return true
+  },
   grammarStar(btn) {
     const id = btn.dataset.id, s = progress.savedGrammar
     progress.savedGrammar = s.includes(id) ? s.filter(x => x !== id) : [...s, id]
@@ -1141,7 +1175,7 @@ const ACTIONS = {
   nextVerb() { state.verb++ },
   nextQ() {
     const qz = state.quiz
-    qz.i++; qz.picked = null; qz.comboPop = false
+    qz.i++; qz.picked = null; qz.comboPop = false; qz.built = []
     window.scrollTo(0, 0)
     if (qz.i >= qz.list.length && !qz.counted) {
       qz.counted = true
@@ -1178,6 +1212,14 @@ const ACTIONS = {
   quizMode(btn) { state.quizMode = btn.dataset.mode; newQuiz() },
   quizGrade(btn) { state.quizGrade = Number(btn.dataset.grade); newQuiz() },
   restartQuiz() { newQuiz() },
+  place(btn) { const qz = state.quiz; if (qz.picked !== null) return true; qz.built.push(Number(btn.dataset.p)); SFX.tap() },
+  unplace(btn) { const qz = state.quiz; if (qz.picked !== null) return true; qz.built.splice(Number(btn.dataset.k), 1); SFX.tap() },
+  checkOrder() {
+    const qz = state.quiz, q = qz.list[qz.i]
+    if (!q || !q.order || qz.built.length !== q.order.parts.length) return true
+    pick(qz.built.every((v, i) => v === i) ? 0 : 1)
+    return true
+  },
   setBuddy(btn) {
     const c = catById(btn.dataset.id)
     if (!catOpen(c)) return true
@@ -1237,7 +1279,7 @@ document.addEventListener('keydown', e => {
   // 퀴즈: 1~4 키로 고르기, Enter로 계속
   if (state.view === 'quiz' && state.quiz && state.quiz.i < state.quiz.list.length && !e.target.closest?.('select')) {
     const n = Number(e.key)
-    if (state.quiz.picked === null && n >= 1 && n <= state.quiz.list[state.quiz.i].choices.length) { e.preventDefault(); return pick(n - 1) }
+    if (state.quiz.picked === null && !state.quiz.list[state.quiz.i].order && n >= 1 && n <= state.quiz.list[state.quiz.i].choices.length) { e.preventDefault(); return pick(n - 1) }
   }
   const vr = e.target.closest && e.target.closest('tr[data-verb]')
   if (vr && e.key === 'Enter') { e.preventDefault(); openVerb(vr); return }

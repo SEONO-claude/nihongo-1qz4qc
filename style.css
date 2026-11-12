@@ -696,3 +696,32 @@ html.opening, html.opening body { overflow: hidden; }
 .sp-next .icon { width: 18px; height: 18px; }
 .sp-now { margin: 4px 0 6px 48px; font-size: 12px; color: var(--ink-3); }
 .sp-now b { color: var(--pink-d); font-weight: 500; }
+
+/* ───── 문법: 주제 묶음 · 헷갈리는 짝 · 새 문제 ───── */
+.gtheme { display: flex; align-items: baseline; justify-content: space-between; padding: 14px 20px 6px; background: var(--raised); border-top: 2px solid var(--line); font-family: var(--round); font-size: 15px; color: var(--ink-2); }
+.gtheme:first-child { border-top: 0; }
+.gtheme b { font-weight: 400; color: var(--ink); }
+.gtheme .num { font-family: var(--sans); font-size: 12px; color: var(--ink-3); }
+mark.gmark { background: linear-gradient(transparent 52%, rgba(255, 194, 60, 0.5) 52%); color: inherit; padding: 0 1px; }
+.gsim { margin: 12px 0 4px; padding: 12px; border-radius: 12px; background: var(--raised); }
+.gsim b { display: block; font-family: var(--round); font-size: 14px; font-weight: 400; color: var(--ink-2); margin-bottom: 6px; }
+.gsimlist { display: flex; flex-wrap: wrap; gap: 6px; }
+.gsimbtn { display: inline-flex; flex-direction: column; align-items: flex-start; padding: 6px 10px; border: 2px solid var(--line); border-radius: 10px; background: var(--card); color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
+.gsimbtn span { font-size: 15px; }
+.gsimbtn small { font-size: 11px; color: var(--ink-3); }
+.gsim p { margin: 8px 0 0; font-size: 13px; color: var(--ink-2); line-height: 1.6; }
+.gsent .blank { display: inline-block; min-width: 3em; color: var(--acc-d); font-weight: 600; }
+/* 문장 배열 */
+.oline { display: flex; flex-wrap: wrap; align-content: flex-start; gap: 6px; min-height: 56px; margin: 4px 16px 12px; padding: 8px; border-bottom: 2px dashed var(--edge); }
+.oline.ok { border-bottom-color: var(--leaf); background: var(--leaf-t); border-radius: 12px; }
+.oline.miss { border-bottom-color: var(--bad); background: var(--bad-t); border-radius: 12px; }
+.ohint { align-self: center; color: var(--ink-3); font-size: 13px; }
+.opool { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; padding: 0 16px 12px; }
+.opiece { padding: 8px 12px; border: 2px solid var(--line); border-bottom-width: 4px; border-radius: 12px; background: var(--card); color: var(--ink); font-family: var(--jp); font-size: 17px; line-height: 1.6; cursor: pointer; transition: transform 150ms var(--spring); }
+.opiece:active { transform: scale(0.95); }
+.opiece.ghost { visibility: hidden; }
+.opiece rt { font-size: 10px; }
+.ocheck { display: block; margin: 0 auto 16px; min-width: 160px; }
+/* 퀴즈 위 줄: 동사·한자·문법 탭은 한 줄로, 고르기 상자가 남는 폭을 쓴다 */
+.quizbar .tabs { flex-wrap: nowrap; flex: none; }
+.quizbar .gradesel { flex: 1 1 auto; min-width: 0; }
