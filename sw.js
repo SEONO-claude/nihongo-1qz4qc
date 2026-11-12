@@ -1,6 +1,6 @@
 // 오프라인용 서비스 워커: 앱 파일을 폰에 저장해 두고 인터넷 없이도 연다.
 // 인터넷이 될 때는 항상 새 파일을 받고, 그 사본을 저장해 둔다.
-const VERSION = 'v38'
+const VERSION = 'v39'
 const CACHE = `nihongo-${VERSION}`
 const FILES = [
   './',
@@ -79,6 +79,28 @@ const FILES = [
   './images/cat-mofu-cheer.webp',
   './images/cat-mofu-sad.webp',
   './images/cat-mofu-party.webp',
+  './images/cat-mike-mid.webp',
+  './images/cat-mike-high.webp',
+  './images/cat-kuro-mid.webp',
+  './images/cat-kuro-high.webp',
+  './images/cat-shiro-mid.webp',
+  './images/cat-shiro-high.webp',
+  './images/cat-mikan-mid.webp',
+  './images/cat-mikan-high.webp',
+  './images/cat-moka-mid.webp',
+  './images/cat-moka-high.webp',
+  './images/cat-hachi-mid.webp',
+  './images/cat-hachi-high.webp',
+  './images/cat-gin-mid.webp',
+  './images/cat-gin-high.webp',
+  './images/cat-tora-mid.webp',
+  './images/cat-tora-high.webp',
+  './images/cat-maru-mid.webp',
+  './images/cat-maru-high.webp',
+  './images/cat-sabi-mid.webp',
+  './images/cat-sabi-high.webp',
+  './images/cat-mofu-mid.webp',
+  './images/cat-mofu-high.webp',
   './audio/bgm.mp3',
   './audio/bgm-01.mp3',
   './audio/bgm-02.mp3',

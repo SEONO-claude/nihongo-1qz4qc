@@ -284,11 +284,16 @@ for (const id of ['kuro', 'shiro', 'mikan', 'moka', 'hachi', 'gin', 'tora', 'mar
   IMAGES['cat-' + id] = IMAGES['cat-' + id] || `images/cat-${id}.webp`
   for (const m of ['think', 'cheer', 'sad', 'party']) IMAGES[`cat-${id}-${m}`] = IMAGES[`cat-${id}-${m}`] || `images/cat-${id}-${m}.webp`
 }
+// 중학교·고등학교 교복 (미케 포함 11마리)
+for (const id of ['mike', 'kuro', 'shiro', 'mikan', 'moka', 'hachi', 'gin', 'tora', 'maru', 'sabi', 'mofu'])
+  for (const o of ['mid', 'high']) IMAGES[`cat-${id}-${o}`] = IMAGES[`cat-${id}-${o}`] || `images/cat-${id}-${o}.webp`
 // 미케 그림 (포즈가 없으면 기본 모습)
 function mascot(mood = 'mascot', cls = 'mascot') {
   // 단짝이 미케가 아니면 그 고양이가 나온다 (표정: think 생각, cheer 정답, sad 응원, party 축하)
   const b = typeof buddy === 'function' ? buddy() : { id: 'mike', name: '미케' }
-  const src = b.id === 'mike' ? (IMAGES[mood] || IMAGES.mascot) : (IMAGES[`cat-${b.id}-${mood}`] || catImage(b))
+  const o = typeof outfit === 'function' ? outfit() : 'elem'
+  const src = o !== 'elem' && IMAGES[`cat-${b.id}-${o}`] ? IMAGES[`cat-${b.id}-${o}`]
+    : b.id === 'mike' ? (IMAGES[mood] || IMAGES.mascot) : (IMAGES[`cat-${b.id}-${mood}`] || catImage(b))
   return src ? `<img class="${cls}" src="${src}" alt="${b.name}" width="320" height="320">` : ''
 }
 const CHEERS = ['정답이에요', '잘했어요', '완벽해요', '좋아요, 그대로 가요', '역시 내 친구']
@@ -461,7 +466,7 @@ function homeView() {
   const nextGoal = allClear ? '' : `
   <div class="panel nextgoal">
     <div class="eyebrow">다음 목표 <span class="num">· Lv.${playerLevel() + 1}까지</span></div>
-    <div class="ngmain"><span class="smark" lang="ja">${schoolOf(nextSt.school).mark}</span>
+    <div class="ngmain"><span class="smark">${schoolIcon(nextSt.school)}</span>
       <div><b>${schoolOf(nextSt.school).name} ${nextSt.name} 통과하기</b><small>10문제 중 ${PASS}개 이상 맞히면 통과</small></div>
       <button class="btn pri" data-act="questContinue">도전</button></div>
     ${prizes.length ? `<div class="ngprize"><span>통과하면 열려요</span>${prizes.map(u => `<span class="ktag ${u.kind}">${u.label}</span>`).join('')}</div>` : ''}
@@ -1098,6 +1103,14 @@ function talkView() {
 }
 
 // ───── 퀘스트 지도 ─────
+// 학교 건물 아이콘: 초등학교 → 중학교 → 고등학교로 갈수록 커진다 (창문은 칸 색으로 비워 보이게)
+const SCHOOL_ICON = {
+  elem: '<svg class="schoolsvg" viewBox="0 0 24 24" aria-hidden="true"><path class="wall" d="M4 12h16v9H4z"/><path class="wall" d="M9 12V8.2L12 5l3 3.2V12z"/><path class="flag" d="M12 5V1.6"/><path class="wall" d="M12 1.6h3.2L12 3.4z"/><circle class="win" cx="12" cy="9.3" r="1.25"/><rect class="win" x="5.8" y="14" width="2.6" height="2.4" rx=".4"/><rect class="win" x="15.6" y="14" width="2.6" height="2.4" rx=".4"/><rect class="win" x="10.6" y="16.4" width="2.8" height="4.6" rx=".4"/></svg>',
+  mid: '<svg class="schoolsvg" viewBox="0 0 24 24" aria-hidden="true"><path class="wall" d="M2.5 10h19v11h-19z"/><path class="wall" d="M9.2 10V6.3L12 3.5l2.8 2.8V10z"/><circle class="win" cx="12" cy="7.4" r="1.25"/><rect class="win" x="4.2" y="12" width="2.4" height="2.2" rx=".4"/><rect class="win" x="8.1" y="12" width="2.4" height="2.2" rx=".4"/><rect class="win" x="13.5" y="12" width="2.4" height="2.2" rx=".4"/><rect class="win" x="17.4" y="12" width="2.4" height="2.2" rx=".4"/><rect class="win" x="4.2" y="16" width="2.4" height="2.2" rx=".4"/><rect class="win" x="17.4" y="16" width="2.4" height="2.2" rx=".4"/><rect class="win" x="10.6" y="16.2" width="2.8" height="4.8" rx=".4"/></svg>',
+  high: '<svg class="schoolsvg" viewBox="0 0 24 24" aria-hidden="true"><path class="wall" d="M1.5 9.5h21V21h-21z"/><path class="wall" d="M9.4 9.5V4h5.2v5.5z"/><path class="wall" d="M8.8 4.2 12 1.2l3.2 3z"/><circle class="win" cx="12" cy="6.4" r="1.3"/><rect class="win" x="3.2" y="11.4" width="2.2" height="2.1" rx=".4"/><rect class="win" x="6.8" y="11.4" width="2.2" height="2.1" rx=".4"/><rect class="win" x="15" y="11.4" width="2.2" height="2.1" rx=".4"/><rect class="win" x="18.6" y="11.4" width="2.2" height="2.1" rx=".4"/><rect class="win" x="3.2" y="15" width="2.2" height="2.1" rx=".4"/><rect class="win" x="6.8" y="15" width="2.2" height="2.1" rx=".4"/><rect class="win" x="15" y="15" width="2.2" height="2.1" rx=".4"/><rect class="win" x="18.6" y="15" width="2.2" height="2.1" rx=".4"/><rect class="win" x="10.5" y="15.6" width="3" height="5.4" rx=".4"/></svg>',
+}
+function schoolIcon(id) { return SCHOOL_ICON[id] || SCHOOL_ICON.elem }
+
 const PAW = '<svg class="pawsvg" viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="15.6" rx="5.2" ry="4.3"/><ellipse cx="5.9" cy="10.2" rx="2.1" ry="2.5" transform="rotate(-18 5.9 10.2)"/><ellipse cx="9.7" cy="6.6" rx="2.2" ry="2.7" transform="rotate(-6 9.7 6.6)"/><ellipse cx="14.3" cy="6.6" rx="2.2" ry="2.7" transform="rotate(6 14.3 6.6)"/><ellipse cx="18.1" cy="10.2" rx="2.1" ry="2.5" transform="rotate(18 18.1 10.2)"/></svg>'
 const LOCK = '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 11V7a5 5 0 0 1 10 0v4 M5 11h14v10H5z"/></svg>'
 function starsHTML(n) { return `<span class="stars" aria-label="별 ${n}개">${[1, 2, 3].map(k => `<i class="${k <= n ? 'on' : ''}">★</i>`).join('')}</span>` }
@@ -1110,7 +1123,7 @@ function questView() {
     const color = `--c:var(--${s.color});--cd:var(--${s.color}-d);--ct:var(--${s.color}-t)`
     if (!stageUnlocked(first)) {
       return `<section class="school locked" style="${color}">
-        <div class="schoolhd"><span class="smark" lang="ja">${s.mark}</span><div><b>${s.name}</b><small>${SCHOOLS[si - 1].name} 졸업 시험을 통과하면 열려요</small></div>${LOCK}</div>
+        <div class="schoolhd"><span class="smark">${schoolIcon(s.id)}</span><div><b>${s.name}</b><small>${SCHOOLS[si - 1].name} 졸업 시험을 통과하면 열려요</small></div>${LOCK}</div>
         <div class="reward">보상 미리보기 · ${s.reward}</div></section>`
     }
     const done = s.stages.filter(x => stageStars(x.id)).length
@@ -1126,7 +1139,7 @@ function questView() {
       </div>`
     }).join('')
     return `<section class="school${grad ? ' grad' : ''}" style="${color}">
-      <div class="schoolhd"><span class="smark" lang="ja">${s.mark}</span><div><b>${s.name}</b><small>${grad ? '졸업했어요' : `${done} / ${s.stages.length} 통과`}</small></div>
+      <div class="schoolhd"><span class="smark">${schoolIcon(s.id)}</span><div><b>${s.name}</b><small>${grad ? '졸업했어요' : `${done} / ${s.stages.length} 통과`}</small></div>
         ${grad ? `<button class="gradbadge" data-act="reportCard" data-school="${s.id}">졸업 · 성적표</button>` : ''}</div>
       <div class="path">${nodes}</div></section>`
   }).join('')
@@ -1180,6 +1193,9 @@ function stageDoneView() {
     </div>
     ${qz.levelUp ? `<div class="levelup"><span class="lvbig num">Lv.${qz.levelUp}</span><span>레벨 업 · ${rankName()}</span></div>` : ''}
     ${diploma}
+    ${qz.graduated && sc.id !== 'high' ? `<div class="newcat grow"><div class="eyebrow">${sc.id === 'elem' ? '중학생이 됐어요' : '고등학생이 됐어요'}</div>
+      <img src="${catImage(buddy())}" alt="${buddy().name}" width="400" height="400">
+      <b>${buddy().name}도 ${sc.id === 'elem' ? '중학교' : '고등학교'} 교복으로 갈아입었어요</b><small>친구들 모두 함께 자랐어요</small></div>` : ''}
     ${rewardsHTML(qz)}
     ${list}
     <div class="actions">${nextBtn}<button class="btn" data-act="toMap">퀘스트 지도</button></div>

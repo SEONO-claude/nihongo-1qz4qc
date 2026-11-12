@@ -67,7 +67,12 @@ const CATS = [
 function catById(id) { return CATS.find(c => c.id === id) || CATS[0] }
 function catOpen(c) { return !c.at || stageCleared(c.at) }
 function buddy() { const c = catById(progress.buddy); return catOpen(c) ? c : CATS[0] }
-function catImage(c) { return c.id === 'mike' ? IMAGES.mascot : IMAGES['cat-' + c.id] }
+// 지금 다니는 학교에 맞는 옷: 초등(란도셀) → 중학(교복) → 고등(블레이저)
+function outfit() { return progress.graduated.includes('mid') ? 'high' : progress.graduated.includes('elem') ? 'mid' : 'elem' }
+function catImage(c, o = outfit()) {
+  if (o !== 'elem' && IMAGES[`cat-${c.id}-${o}`]) return IMAGES[`cat-${c.id}-${o}`]
+  return c.id === 'mike' ? IMAGES.mascot : IMAGES['cat-' + c.id]
+}
 // "초등학교 3학년 통과"
 function catHint(c) { const st = STAGES[stageIndex(c.at)]; return `${schoolOf(st.school).name} ${st.name} 통과` }
 function catCard(c) {

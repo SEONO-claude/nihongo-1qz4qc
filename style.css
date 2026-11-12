@@ -847,3 +847,10 @@ button.hero-mascot { border: 0; background: none; padding: 0; cursor: pointer; f
 .fixpair { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .fixvs { font-family: var(--round); font-size: 13px; color: var(--ink-3); }
 .fixdiff { margin: 10px 0 0; padding: 10px 12px; border-radius: 12px; background: var(--raised); font-size: 14px; line-height: 1.6; color: var(--ink-2); }
+
+/* ───── 학교 건물 아이콘 · 교복 ───── */
+.smark .schoolsvg { width: 30px; height: 30px; }
+.schoolsvg .wall { fill: #fff; }
+.schoolsvg .win { fill: var(--c, var(--pink)); }
+.schoolsvg .flag { stroke: #fff; stroke-width: 1.1; fill: none; }
+.newcat.grow { background: var(--sky-t); }
