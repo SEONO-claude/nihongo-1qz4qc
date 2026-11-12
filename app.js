@@ -1,6 +1,6 @@
 // ───── 진도 저장 (localStorage) ─────
 const STORE_KEY = 'jp-study-progress'
-const EMPTY = { seen: {}, seenKanji: [], learnedForms: [], wrong: [], learnedKanji: [], wrongKanji: [], lastStudy: '', studyDays: [], today: { date: '', cards: 0, quizzes: 0, xp: 0 }, xp: 0, sound: true, savedGrammar: [], seenGrammar: [] }
+const EMPTY = { seen: {}, seenKanji: [], learnedForms: [], wrong: [], learnedKanji: [], wrongKanji: [], lastStudy: '', studyDays: [], today: { date: '', cards: 0, quizzes: 0, xp: 0 }, xp: 0, sound: true, savedGrammar: [], seenGrammar: [], learnedGrammar: [], wrongGrammar: [] }
 
 function loadProgress() {
   try { return { ...EMPTY, ...JSON.parse(localStorage.getItem(STORE_KEY) || '{}') } }
@@ -144,11 +144,11 @@ const pickOne = list => list[Math.floor(Math.random() * list.length)]
 
 // ───── 공통 ─────
 const app = document.getElementById('app')
-const state = { view: 'home', cardType: 'verb', cardIdx: { verb: 0, adj: 0, noun: 0 }, verb: 0, kanji: null, quiz: null, grade: 1, conjMode: 'one', conjGroup: 0, quizMode: 'verb', quizGrade: 0, grammarLevel: 'N5', grammarOpen: null }
+const state = { view: 'home', cardType: 'verb', cardIdx: { verb: 0, adj: 0, noun: 0 }, verb: 0, kanji: null, quiz: null, grade: 1, conjMode: 'one', conjGroup: 0, quizMode: 'verb', quizGrade: 0, grammarLevel: 'N5', grammarOpen: null, quizLevel: 'N5' }
 
 function newQuiz() {
-  const list = state.quizMode === 'kanji'
-    ? buildKanjiQuiz(state.quizGrade, progress.wrongKanji)
+  const list = state.quizMode === 'kanji' ? buildKanjiQuiz(state.quizGrade, progress.wrongKanji)
+    : state.quizMode === 'grammar' ? buildGrammarQuiz(state.quizLevel, progress.savedGrammar, progress.wrongGrammar)
     : buildVerbQuiz(progress.wrong)
   state.quiz = { list, i: 0, picked: null, right: 0, missed: [], combo: 0, best: 0, xp: 0 }
 }
@@ -259,7 +259,7 @@ function homeView() {
   const allK = progress.seenKanji.filter(c => KANJI[c]).length
   const totalK = Object.keys(KANJI).length
   const date = new Date().toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })
-  const wrong = progress.wrong.length + progress.wrongKanji.length
+  const wrong = progress.wrong.length + progress.wrongKanji.length + progress.wrongGrammar.length
   const kanjiQ = Object.values(KANJI).reduce((n, k) => n + 1 + k.examples.length, 0)
   const weekday = new Date().toLocaleDateString('ko-KR', { weekday: 'long' })
   const t = todayStats(), s = streak(), studiedToday = progress.studyDays.includes(todayStr())
@@ -334,6 +334,7 @@ function homeView() {
     ${bar('맞힌 동사 형태', progress.learnedForms.length, formTotal)}
     ${bar('맞힌 한자 문제', progress.learnedKanji.length, kanjiQ)}
     ${bar('본 JLPT 문법', progress.seenGrammar.filter(id => GRAMMAR.some(g => g.id === id)).length, GRAMMAR.length)}
+    ${bar('맞힌 문법 문제', progress.learnedGrammar.length, GRAMMAR.reduce((n, g) => n + 2 + g.examples.length, 0))}
     <div class="row"><div class="label">다시 볼 문제<span class="num${wrong ? ' key' : ''}">${wrong}개</span></div></div>
   </div>
   ${offlineReady ? '<p class="sub offline">인터넷 없이도 열 수 있어요</p>' : ''}`
@@ -572,17 +573,20 @@ function grammarView() {
   return `
   <div class="ghero">${mascot('mascot')}<div><h1>JLPT 문법</h1><p>N5 기초부터 N1 핵심까지 · 헷갈리는 건 저장해 두고 다시 봐요</p></div></div>
   <div class="tabs gtabs">${tabs}</div>
-  ${lv !== 'saved' && list.length ? `<p class="sub">${lv} 문법 ${list.length}개 · 본 문법 <span class="num">${seen} / ${list.length}</span></p>` : ''}
+  ${list.length ? `<div class="subbar"><p class="sub">${lv === 'saved' ? `저장한 문법 ${list.length}개` : `${lv} 문법 ${list.length}개 · 본 문법 <span class="num">${seen} / ${list.length}</span>`}</p>
+    <button class="btn" data-act="grammarQuiz">${lv === 'saved' ? '저장한 문법 퀴즈' : `${lv} 문법 퀴즈`}</button></div>` : ''}
   <div class="panel glist">${items}${empty}</div>`
 }
 
 // ───── 퀴즈 ─────
 function quizHeader() {
-  const modes = [['verb', '동사 변화'], ['kanji', '한자']]
+  const modes = [['verb', '동사'], ['kanji', '한자'], ['grammar', '문법']]
     .map(([m, label]) => `<button class="${state.quizMode === m ? 'on' : ''}" data-act="quizMode" data-mode="${m}">${label}</button>`).join('')
-  // 한 줄로: [동사 변화 | 한자] + 한자일 때 학년 고르기
+  // 한 줄로: [동사 | 한자 | 문법] + 한자는 학년, 문법은 급수 고르기
   const grades = state.quizMode === 'kanji'
     ? `<select class="gradesel" data-act="quizGradeSel" aria-label="학년 고르기">${[0, 1, 2, 3, 4, 5, 6].map(g => `<option value="${g}" ${state.quizGrade === g ? 'selected' : ''}>${g ? `${g}학년` : '전체 학년'}</option>`).join('')}</select>`
+    : state.quizMode === 'grammar'
+    ? `<select class="gradesel" data-act="quizLevelSel" aria-label="급수 고르기">${[...LEVELS, 'all', 'saved'].map(l => `<option value="${l}" ${state.quizLevel === l ? 'selected' : ''}>${l === 'all' ? '전체 급수' : l === 'saved' ? `★ 저장한 문법 (${progress.savedGrammar.length})` : l}</option>`).join('')}</select>`
     : ''
   return `<div class="quizbar"><div class="tabs">${modes}</div>${grades}</div>`
 }
@@ -597,6 +601,9 @@ function quizTop(qz) {
 
 function quizView() {
   const qz = state.quiz
+  if (!qz.list.length) return quizHeader() + `
+  <div class="panel"><div class="gempty">${mascot('think')}<p>저장한 문법이 아직 없어요.<br><b>문법</b> 메뉴에서 헷갈리는 문법에 <b>☆ 저장</b>을 눌러 보세요</p>
+    <button class="btn pri" data-go="grammar">문법 보러 가기</button></div></div>`
   if (qz.i >= qz.list.length) return quizHeader() + quizDoneView()
   const q = qz.list[qz.i]
   const answered = qz.picked !== null
@@ -662,9 +669,9 @@ function pick(i) {
   const [x, y] = btn ? centerOf(btn) : [innerWidth / 2, innerHeight / 2]
   qz.picked = i
   const q = qz.list[qz.i]
-  const kanji = state.quizMode === 'kanji'
-  const learned = kanji ? 'learnedKanji' : 'learnedForms'
-  const wrong = kanji ? 'wrongKanji' : 'wrong'
+  const m = state.quizMode
+  const learned = m === 'kanji' ? 'learnedKanji' : m === 'grammar' ? 'learnedGrammar' : 'learnedForms'
+  const wrong = m === 'kanji' ? 'wrongKanji' : m === 'grammar' ? 'wrongGrammar' : 'wrong'
   const ok = q.choices[i].ok
   if (ok) {
     qz.right++
@@ -701,6 +708,7 @@ const ACTIONS = {
   nextCard() { state.cardIdx[state.cardType]++; state.kanji = null; state.slide = 'next'; markSeen(); SFX.tap() },
   sound() { progress.sound = !progress.sound; saveProgress(); updateTop(); SFX.tap(); return true },
   grammarLevel(btn) { state.grammarLevel = btn.dataset.level; state.grammarOpen = null },
+  grammarQuiz() { state.quizMode = 'grammar'; state.quizLevel = state.grammarLevel; go('quiz'); return true },
   grammarOpen(btn) {
     const id = btn.dataset.id
     state.grammarOpen = state.grammarOpen === id ? null : id
@@ -798,6 +806,7 @@ document.addEventListener('change', e => {
   if (e.target.matches('select[data-act="pickVerb"]')) { state.verb = Number(e.target.value); render() }
   if (e.target.matches('select[data-act="pickCard"]')) { ACTIONS.pickCard(e.target); render() }
   if (e.target.matches('select[data-act="quizGradeSel"]')) { state.quizGrade = Number(e.target.value); newQuiz(); render() }
+  if (e.target.matches('select[data-act="quizLevelSel"]')) { state.quizLevel = e.target.value; newQuiz(); render() }
 })
 
 // ───── 오프라인 (홈 화면에 추가해서 쓸 때) ─────

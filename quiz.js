@@ -130,6 +130,71 @@ function makeMeaningQuestion(key, pool) {
   }
 }
 
+// ───── 문법 퀴즈 ─────
+// 문제 키: "ga:n4_temiru" 뜻 고르기, "gc:n4_temiru" 일본어 고르기, "gb:n4_temiru:0" 예문 속 문법 찾기
+function grammarById(id) { return GRAMMAR.find(g => g.id === id) }
+
+// level: 'N5'~'N1', 'all', 'saved'
+function grammarPool(level, saved) {
+  if (level === 'saved') return GRAMMAR.filter(g => saved.includes(g.id))
+  return GRAMMAR.filter(g => level === 'all' || g.level === level)
+}
+
+// 오답 보기는 같은 급수에서 고른다 (모자라면 전체에서)
+function grammarOthers(g, pool, key) {
+  const same = shuffle(GRAMMAR.filter(x => x.id !== g.id && x.level === g.level))
+  const rest = shuffle(GRAMMAR.filter(x => x.id !== g.id && x.level !== g.level))
+  const picks = [], seen = new Set([key(g)])
+  for (const x of [...same, ...rest]) {
+    if (picks.length >= 3) break
+    if (!seen.has(key(x))) { seen.add(key(x)); picks.push(x) }
+  }
+  return picks
+}
+
+function makeGrammarQuestion(qkey) {
+  const [type, id, ex] = qkey.split(':')
+  const g = grammarById(id)
+  const plainPattern = x => x.pattern.replace(/\{([^{}|]+)\|[^{}|]+\}/g, '$1')
+  const review = `<span class="jp" lang="ja">${furi(g.pattern)}</span><span class="dim">${g.meaning}</span>`
+  const right = `${furi(g.pattern)} = ${g.meaning}`
+  const wrong = `${furi(g.pattern)} = ${g.meaning} · ${g.explain.replace(/\.$/, '')}`
+  const lv = ` <span class="gqlv">${g.level}</span>`
+  if (type === 'ga') {
+    const others = grammarOthers(g, null, x => x.meaning)
+    return {
+      key: qkey, review, right, wrong,
+      head: `<div class="gq" lang="ja">${furi(g.pattern)}</div>`,
+      prompt: '이 문법의 뜻은' + lv,
+      choices: shuffle([g, ...others].map(x => ({ html: x.meaning, ok: x === g, ko: true }))),
+    }
+  }
+  if (type === 'gc') {
+    const others = grammarOthers(g, null, plainPattern)
+    return {
+      key: qkey, review, right, wrong,
+      head: `<div class="gq ko">${g.meaning}</div>`,
+      prompt: '일본어로 하면' + lv,
+      choices: shuffle([g, ...others].map(x => ({ html: furi(x.pattern), ok: x === g }))),
+    }
+  }
+  // gb: 예문 속 문법 찾기
+  const e = g.examples[Number(ex)]
+  const others = grammarOthers(g, null, plainPattern)
+  return {
+    key: qkey, review, right: `${right} · ${e.ko}`, wrong: `${right} · ${e.ko}`,
+    head: `<div class="gsent" lang="ja">${furi(e.jp)}</div>`,
+    prompt: '쓰인 문법은' + lv,
+    choices: shuffle([g, ...others].map(x => ({ html: furi(x.pattern), ok: x === g }))),
+  }
+}
+
+function buildGrammarQuiz(level, saved, wrongKeys) {
+  const pool = grammarPool(level, saved)
+  const all = pool.flatMap(g => [`ga:${g.id}`, `gc:${g.id}`, ...g.examples.map((_, i) => `gb:${g.id}:${i}`)])
+  return pickKeys(wrongKeys, all).map(makeGrammarQuestion)
+}
+
 // grade 0 = 전체
 function kanjiPool(grade) {
   return Object.keys(KANJI).filter(c => !grade || KANJI[c].grade === grade)

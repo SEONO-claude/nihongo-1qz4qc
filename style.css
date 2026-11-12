@@ -263,6 +263,15 @@ main.wide { max-width: 1040px; }
 .gempty { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 28px 20px; text-align: center; color: var(--ink-2); }
 .gempty .mascot { width: 96px; height: 96px; }
 
+/* 문법 퀴즈 문제 */
+.gq { font-size: 30px; line-height: 2; text-align: center; color: var(--ink); }
+.gq rt { font-size: 12px; }
+.gq.ko { font-family: var(--round); font-size: 26px; line-height: 1.4; }
+.gsent { font-size: 17px; line-height: 2; text-align: center; padding: 4px 12px; border-radius: 14px; background: var(--raised); border: 2px solid var(--line); }
+.feedback span { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.gsent rt { font-size: 10px; }
+.gqlv { display: inline-block; margin-left: 4px; font-family: var(--round); font-size: 12px; line-height: 20px; padding: 0 8px; border-radius: 999px; background: var(--mint-t); color: var(--mint-d); vertical-align: 2px; }
+
 /* ───── 퀴즈 ─────
    폰 한 화면 안에 다 들어오게: 설정 한 줄, 진행 막대, 미케+질문, 2×2 보기, 아래 알림창 */
 .quizbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 12px; }
