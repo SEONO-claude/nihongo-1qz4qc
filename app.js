@@ -1,6 +1,6 @@
 // ───── 진도 저장 (localStorage) ─────
 const STORE_KEY = 'jp-study-progress'
-const EMPTY = { seen: {}, seenKanji: [], learnedForms: [], wrong: [], learnedKanji: [], wrongKanji: [], lastStudy: '', studyDays: [], today: { date: '', cards: 0, quizzes: 0, xp: 0 }, xp: 0, sound: true, music: true, savedGrammar: [], seenHigh: [], seenGrammar: [], learnedGrammar: [], wrongGrammar: [], stages: {}, graduated: [], badges: [], bestCombo: 0, musicVol: 1, sfxVol: 1, buddy: 'mike', track: 'all', talkSeen: [], learnedTalk: [], wrongTalk: [], talkStamps: {}, learnedOno: [], wrongOno: [], review: {}, master: {}, chests: 0, mock: {} }
+const EMPTY = { seen: {}, seenKanji: [], learnedForms: [], wrong: [], learnedKanji: [], wrongKanji: [], lastStudy: '', studyDays: [], today: { date: '', cards: 0, quizzes: 0, xp: 0 }, xp: 0, sound: true, music: true, savedGrammar: [], seenHigh: [], seenGrammar: [], learnedGrammar: [], wrongGrammar: [], stages: {}, graduated: [], badges: [], bestCombo: 0, musicVol: 1, sfxVol: 1, buddy: 'mike', track: 'all', talkSeen: [], learnedTalk: [], wrongTalk: [], talkStamps: {}, learnedOno: [], wrongOno: [], review: {}, master: {}, chests: 0, mock: {}, autoSpeak: false }
 
 function loadProgress() {
   try { return { ...EMPTY, ...JSON.parse(localStorage.getItem(STORE_KEY) || '{}') } }
@@ -1330,8 +1330,9 @@ function pick(i) {
   }
   saveProgress()
   render()
-  if (m === 'talk') { const l = talkLineOf(q.key); if (l) setTimeout(() => speakJa(l.jp), 350) }
-  if (m === 'ono') { const o = onoById(q.key.split(':')[1]); if (o) setTimeout(() => speakJa(o.word), 350) }
+  // 답한 뒤 정답 읽어 주기는 소리 설정에서 켠 사람만 (기본은 끔)
+  if (progress.autoSpeak && m === 'talk') { const l = talkLineOf(q.key); if (l) setTimeout(() => speakJa(l.jp), 350) }
+  if (progress.autoSpeak && m === 'ono') { const o = onoById(q.key.split(':')[1]); if (o) setTimeout(() => speakJa(o.word), 350) }
   if (ok) {
     const gain = qz.combo >= 3 ? 15 : 10
     qz.xp += gain
@@ -1605,6 +1606,7 @@ function toggleSoundPanel() {
         <button class="sp-next" data-skip aria-label="다음 곡"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5l9 7-9 7z M18 5v14"/></svg></button></div>
         <p class="sp-now">지금 · <b id="nowplaying">${trackNow >= 0 ? TRACKS[trackNow].name : ''}</b></p>` : ''}
       ${volRow('sfx', '효과음')}
+      <label class="sp-auto"><input type="checkbox" id="autospeak" ${progress.autoSpeak ? 'checked' : ''}><span>회화·의성어 문제를 풀면 정답을 일본어로 읽어 주기</span></label>
       <p class="sp-note">0으로 내리면 꺼져요 · 전체 크기는 폰 음량 버튼으로</p>`
   }
   draw()
@@ -1617,6 +1619,7 @@ function toggleSoundPanel() {
     row.querySelector('.sp-mute path').setAttribute('d', VOL_ICON[row.dataset.kind](v > 0))
   })
   el.addEventListener('change', e => {
+    if (e.target.id === 'autospeak') { progress.autoSpeak = e.target.checked; saveProgress(); if (progress.autoSpeak) speakJa('はい'); return }
     if (e.target.id === 'tracksel') { chooseTrack(e.target.value === 'all' ? 'all' : Number(e.target.value)); return }
     const r = e.target.closest('input[type=range]'); if (!r) return
     setVol(r.closest('.sp-row').dataset.kind, Number(r.value) / 100, true)
