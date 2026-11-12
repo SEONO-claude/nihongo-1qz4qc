@@ -385,3 +385,47 @@ function buildKanjiQuiz(grade, wrongKeys) {
   const all = pool.flatMap(c => [`m:${c}`, ...readIndexes(c, grade).map(i => `r:${c}:${i}`)])
   return pickKeys(wrongKeys, all).map(k => k.startsWith('r:') ? makeReadQuestion(k, pool) : makeMeaningQuestion(k, pool))
 }
+
+// ───── 실생활 회화 ─────
+// 문제 키: "tw:konbini:3" 이럴 때 뭐라고 할까 · "tm:konbini:0" 들은 말 뜻 · "tb:konbini:5" 문장 조립
+function talkScene(id) { return (typeof TALK === 'undefined' ? [] : TALK).find(s => s.id === id) }
+function talkKeys(sceneId) {
+  const scenes = typeof TALK === 'undefined' ? [] : sceneId === 'all' ? TALK : TALK.filter(s => s.id === sceneId)
+  return scenes.flatMap(s => s.lines.flatMap((l, i) => l.who === 'me'
+    ? [`tw:${s.id}:${i}`, `tb:${s.id}:${i}`] : [`tm:${s.id}:${i}`]))
+}
+function makeTalkQuestion(key) {
+  const [type, sid, idx] = key.split(':')
+  const s = talkScene(sid), l = s.lines[Number(idx)]
+  const tag = ` <span class="gqlv">${s.name}</span>`
+  const review = `<span class="jp" lang="ja">${furi(l.jp)}</span><span class="dim">${l.ko}</span>`
+  const right = l.note || l.ko, wrong = `${furi(l.jp)} = ${l.ko}${l.note ? ' · ' + l.note : ''}`
+  // 오답 보기는 같은 장면에서 먼저, 모자라면 다른 장면에서
+  const others = (pick, same) => {
+    const pool = [...shuffle(s.lines.filter(x => x !== l && same(x))), ...shuffle(TALK.filter(x => x !== s).flatMap(x => x.lines).filter(same))]
+    const out = [], seen = new Set([pick(l)])
+    for (const x of pool) { if (out.length >= 3) break; if (!seen.has(pick(x))) { seen.add(pick(x)); out.push(pick(x)) } }
+    return out
+  }
+  if (type === 'tw') {
+    const opts = [l.jp, ...others(x => x.jp, x => x.who === 'me')]
+    return { key, mode: 'talk', review, right, wrong,
+      head: `<div class="gq ko">${l.when}</div>`, prompt: `이럴 때 뭐라고 할까요${tag}`,
+      choices: shuffle(opts.map(x => ({ html: furi(x), ok: x === l.jp }))) }
+  }
+  if (type === 'tm') {
+    const opts = [l.ko, ...others(x => x.ko, () => true)]
+    return { key, mode: 'talk', review, right: l.when, wrong: `${furi(l.jp)} = ${l.ko}`,
+      head: `<div class="gsent" lang="ja">${furi(l.jp)}</div>`, prompt: `상대가 한 말의 뜻은 <span class="dim">· ${l.when}</span>${tag}`,
+      choices: shuffle(opts.map(x => ({ html: x, ok: x === l.ko, ko: true }))) }
+  }
+  const parts = l.parts.split(' / ')
+  let mix = shuffle(parts.map((_, i) => i))
+  if (mix.every((v, i) => v === i)) mix = [...mix.slice(1), mix[0]]
+  return { key, mode: 'talk', review, right, wrong,
+    head: `<div class="gq ko">${l.ko}</div>`, prompt: `순서대로 놓아 말해 봐요 <span class="dim">· ${l.when}</span>${tag}`,
+    order: { parts: parts.map(furi), mix }, choices: [{ html: '', ok: true }, { html: '', ok: false }] }
+}
+function buildTalkQuiz(sceneId, wrongKeys) {
+  return pickKeys(wrongKeys, talkKeys(sceneId)).map(makeTalkQuestion)
+}

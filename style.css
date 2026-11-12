@@ -725,3 +725,51 @@ mark.gmark { background: linear-gradient(transparent 52%, rgba(255, 194, 60, 0.5
 /* 퀴즈 위 줄: 동사·한자·문법 탭은 한 줄로, 고르기 상자가 남는 폭을 쓴다 */
 .quizbar .tabs { flex-wrap: nowrap; flex: none; }
 .quizbar .gradesel { flex: 1 1 auto; min-width: 0; }
+
+/* ───── 실생활 회화 ───── */
+main[data-view="talk"] { --acc: var(--sky); --acc-d: var(--sky-d); --acc-t: var(--sky-t); }
+.top nav button[data-go="talk"] { --c: var(--leaf); --ct: var(--leaf-t); }
+.linkbtn { display: block; margin: -4px 0 12px auto; padding: 4px 2px; border: 0; background: none; color: var(--sky-d); font: inherit; font-size: 14px; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.thero { background: var(--sky-t); }
+.tboard { padding: 16px 20px 4px; }
+.tgrid { display: grid; grid-template-columns: repeat(10, 1fr); gap: 6px; margin: 10px 0 6px; }
+.tcell { display: grid; place-items: center; aspect-ratio: 1; border: 2px dashed var(--edge); border-radius: 10px; }
+.tstamp { font-family: var(--mincho); font-size: 15px; color: var(--ink-3); opacity: 0.45; }
+.tcell.on { border: 0; }
+.tcell.on .tstamp { display: grid; place-items: center; width: 100%; height: 100%; border: 2px solid #d2402e; border-radius: 50%; color: #d2402e; opacity: 1; font-weight: 700; transform: rotate(-8deg); }
+.tboard .hint { padding: 4px 0 14px; text-align: left; }
+.tscenes { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; margin-bottom: 16px; }
+.tscene { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border: 2px solid var(--line); border-bottom-width: 4px; border-radius: 16px; background: var(--card); color: var(--ink); font: inherit; text-align: left; cursor: pointer; transition: transform 150ms var(--spring); }
+.tscene:active { transform: scale(0.98); }
+.tmark { display: grid; place-items: center; flex: none; width: 44px; height: 44px; border-radius: 14px; background: var(--sky); color: #fff; font-family: var(--mincho); font-size: 24px; font-weight: 600; box-shadow: 0 3px 0 var(--sky-d); }
+.tscene.done .tmark { background: var(--leaf); box-shadow: 0 3px 0 var(--leaf-d); }
+.tbody { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.tbody b { font-family: var(--round); font-size: 17px; font-weight: 400; }
+.tbody small { color: var(--ink-3); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tprog { height: 6px; border-radius: 999px; background: var(--line); overflow: hidden; margin-top: 4px; }
+.tprog i { display: block; height: 100%; background: var(--sky); border-radius: 999px; }
+.tcount { color: var(--ink-3); font-size: 12px; }
+.tdone { display: grid; place-items: center; flex: none; width: 36px; height: 36px; border: 2px solid #d2402e; border-radius: 50%; color: #d2402e; font-family: var(--mincho); font-size: 18px; font-weight: 700; transform: rotate(-10deg); }
+.tdetailhead { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+.tdetailhead > div { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.tdetailhead b { font-family: var(--round); font-size: 22px; font-weight: 400; }
+.tdetailhead small { color: var(--ink-3); font-size: 13px; }
+.tlines { padding: 12px 14px 4px; }
+.tline { display: flex; flex-direction: column; margin-bottom: 12px; }
+.tline.me { align-items: flex-end; }
+.twho { font-size: 11px; color: var(--ink-3); margin: 0 6px 3px; }
+.tbubble { position: relative; max-width: 88%; padding: 10px 44px 10px 14px; border-radius: 16px; background: var(--raised); display: flex; flex-direction: column; gap: 2px; }
+.tline.me .tbubble { background: var(--sky-t); border-bottom-right-radius: 4px; }
+.tline.them .tbubble { border-bottom-left-radius: 4px; }
+.tbubble .jp { font-size: 17px; line-height: 1.9; }
+.tbubble .ko { font-size: 13px; color: var(--ink-2); }
+.tnote { margin-top: 4px; font-size: 12px; color: var(--sky-d); }
+.tspeak { position: absolute; right: 6px; top: 8px; display: grid; place-items: center; width: 32px; height: 32px; border: 0; border-radius: 10px; background: var(--card); color: var(--sky-d); cursor: pointer; }
+.tspeak .icon { width: 18px; height: 18px; }
+.tspeak.on { background: var(--sky); color: #fff; }
+.tline.seen .twho::after { content: " · 들어 봄"; color: var(--sky-d); }
+.talkstampwin { display: flex; align-items: center; gap: 14px; margin: 0 16px 8px; padding: 14px; border-radius: 16px; background: var(--sky-t); animation: popIn 500ms var(--spring) 300ms both; }
+.talkstampwin b { display: block; font-family: var(--round); font-size: 18px; font-weight: 400; }
+.talkstampwin small { color: var(--ink-2); font-size: 13px; }
+.tstamp.big { display: grid; place-items: center; width: 56px; height: 56px; border: 3px solid #d2402e; border-radius: 50%; color: #d2402e; opacity: 1; font-size: 28px; font-weight: 700; --r: -10deg; animation: stampIn 600ms var(--spring) 600ms both; }
+@media (max-width: 520px) { .tgrid { grid-template-columns: repeat(5, 1fr); } .quizbar .tabs button { padding: 0 9px; } }

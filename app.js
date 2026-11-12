@@ -1,6 +1,6 @@
 // ───── 진도 저장 (localStorage) ─────
 const STORE_KEY = 'jp-study-progress'
-const EMPTY = { seen: {}, seenKanji: [], learnedForms: [], wrong: [], learnedKanji: [], wrongKanji: [], lastStudy: '', studyDays: [], today: { date: '', cards: 0, quizzes: 0, xp: 0 }, xp: 0, sound: true, music: true, savedGrammar: [], seenHigh: [], seenGrammar: [], learnedGrammar: [], wrongGrammar: [], stages: {}, graduated: [], badges: [], bestCombo: 0, musicVol: 1, sfxVol: 1, buddy: 'mike', track: 'all' }
+const EMPTY = { seen: {}, seenKanji: [], learnedForms: [], wrong: [], learnedKanji: [], wrongKanji: [], lastStudy: '', studyDays: [], today: { date: '', cards: 0, quizzes: 0, xp: 0 }, xp: 0, sound: true, music: true, savedGrammar: [], seenHigh: [], seenGrammar: [], learnedGrammar: [], wrongGrammar: [], stages: {}, graduated: [], badges: [], bestCombo: 0, musicVol: 1, sfxVol: 1, buddy: 'mike', track: 'all', talkSeen: [], learnedTalk: [], wrongTalk: [], talkStamps: {} }
 
 function loadProgress() {
   try { return { ...EMPTY, ...JSON.parse(localStorage.getItem(STORE_KEY) || '{}') } }
@@ -297,7 +297,7 @@ const pickOne = list => list[Math.floor(Math.random() * list.length)]
 
 // ───── 공통 ─────
 const app = document.getElementById('app')
-const state = { view: 'home', cardType: 'verb', cardIdx: { verb: 0, adj: 0, noun: 0, high: 0 }, verb: 0, kanji: null, quiz: null, grade: 1, conjMode: 'one', conjGroup: 0, quizMode: 'verb', quizGrade: 0, grammarLevel: 'N5', grammarOpen: null, quizLevel: 'N5', quizTab: 'quest', stage: null, verbQuizLevel: 'all' }
+const state = { view: 'home', cardType: 'verb', cardIdx: { verb: 0, adj: 0, noun: 0, high: 0 }, verb: 0, kanji: null, quiz: null, grade: 1, conjMode: 'one', conjGroup: 0, quizMode: 'verb', quizGrade: 0, grammarLevel: 'N5', grammarOpen: null, quizLevel: 'N5', quizTab: 'quest', stage: null, verbQuizLevel: 'all', talkScene: null, talkQuiz: 'all', showCasual: false }
 
 // ───── 퀘스트 진행 ─────
 function stageStars(id) { return progress.stages[id] || 0 }
@@ -317,6 +317,7 @@ function newQuiz() {
   const wrong = { kanji: progress.wrongKanji, verb: progress.wrong, grammar: progress.wrongGrammar }
   const list = state.quizMode === 'stage' ? buildStageQuiz(STAGES.find(s => s.id === state.stage), wrong)
     : state.quizMode === 'kanji' ? buildKanjiQuiz(state.quizGrade, progress.wrongKanji)
+    : state.quizMode === 'talk' ? buildTalkQuiz(state.talkQuiz || 'all', progress.wrongTalk)
     : state.quizMode === 'grammar' ? buildGrammarQuiz(state.quizLevel, progress.savedGrammar, progress.wrongGrammar)
     : buildVerbQuiz(progress.wrong, state.verbQuizLevel)
   state.quiz = { list, i: 0, picked: null, right: 0, missed: [], combo: 0, best: 0, xp: 0, built: [] }
@@ -396,7 +397,7 @@ function go(view) {
 }
 
 function render() {
-  document.querySelectorAll('.top nav button').forEach(b => b.classList.toggle('on', b.dataset.go === state.view))
+  document.querySelectorAll('.top nav button').forEach(b => b.classList.toggle('on', b.dataset.go === (state.view === 'conj' ? 'cards' : state.view)))
   app.classList.toggle('wide', state.view === 'conj' && state.conjMode === 'all')
   app.classList.toggle('homewide', state.view === 'home')
   app.dataset.view = state.view
@@ -528,6 +529,7 @@ function homeView() {
   </div>
   <div class="panel">
     <div class="hd">지금까지</div>
+    ${bar('회화 장면 도장', Object.keys(progress.talkStamps).length, typeof TALK === 'undefined' ? 20 : TALK.length)}
     ${bar('고양이 친구', CATS.filter(catOpen).length, CATS.length)}
     ${bar('딴 배지', progress.badges.length, BADGES.length)}
     ${bar('한자 전체', allK, totalK)}
@@ -728,6 +730,7 @@ function cardsView() {
   const hint = [w.note ? w.note.replace(/\.$/, '') : '', hasKanji ? '한자를 누르면 음독과 훈독이 나와요' : ''].filter(Boolean).join(' · ')
   return `
   <div class="tabs cardtabs">${tabs}</div>
+  ${type === 'verb' ? '<button class="linkbtn" data-go="conj">동사 변화표 전체 보기</button>' : ''}
   <div class="picker">
     <select data-act="pickCard" aria-label="${CARD_TYPES[type].label} 고르기">${cardOptions()}</select>
   </div>
@@ -885,6 +888,64 @@ function grammarView() {
   <div class="panel glist">${items}${empty}</div>`
 }
 
+// ───── 실생활 회화 ─────
+// 일본어 읽어 주기: 폰에 들어 있는 일본어 음성 (인터넷 필요 없음)
+function speakJa(furiText) {
+  try {
+    if (!progress.sound || !window.speechSynthesis) return
+    const text = furiText.replace(/\{([^{}|]+)\|[^{}|]+\}/g, '$1')
+    const u = new SpeechSynthesisUtterance(text)
+    u.lang = 'ja-JP'; u.rate = 0.9
+    const v = speechSynthesis.getVoices().find(x => /^ja/i.test(x.lang))
+    if (v) u.voice = v
+    u.volume = Math.max(0.2, progress.sfxVol ?? 1)
+    speechSynthesis.cancel(); speechSynthesis.speak(u)
+  } catch { /* 읽어 줄 수 없는 기기 */ }
+}
+function talkLineOf(key) { const [, sid, i] = key.split(':'); const s = talkScene(sid); return s && s.lines[Number(i)] }
+function talkSeenCount(s) { return s.lines.filter((_, i) => progress.talkSeen.includes(`${s.id}:${i}`)).length }
+const SPEAK_ICON = '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4V5Z M15.5 8.5a5 5 0 0 1 0 7"/></svg>'
+
+function talkView() {
+  const scenes = typeof TALK === 'undefined' ? [] : TALK
+  const stamps = Object.keys(progress.talkStamps).length
+  const head = `<div class="ghero thero">${mascot('mascot')}<div><h1>실생활 회화</h1><p>여행과 생활에서 바로 쓰는 문장 · 장면 퀴즈를 통과하면 도장</p></div></div>`
+  if (!state.talkScene || !talkScene(state.talkScene)) {
+    const board = scenes.map(s => `<span class="tcell${progress.talkStamps[s.id] ? ' on' : ''}" title="${s.name}"><span class="tstamp" lang="ja">${s.mark}</span></span>`).join('')
+    const cards = scenes.map(s => {
+      const seen = talkSeenCount(s), st = progress.talkStamps[s.id]
+      return `<button class="tscene${st ? ' done' : ''}" data-act="talkOpen" data-id="${s.id}">
+        <span class="tmark" lang="ja">${s.mark}</span>
+        <span class="tbody"><b>${s.name}</b><small>${s.desc}</small><span class="tprog"><i style="width:${seen / s.lines.length * 100}%"></i></span></span>
+        ${st ? '<span class="tdone" lang="ja">済</span>' : `<span class="num tcount">${seen}/${s.lines.length}</span>`}</button>`
+    }).join('')
+    return `${head}
+    <div class="panel tboard"><div class="eyebrow">장면 도장판 <span class="num">· ${stamps} / ${scenes.length}</span></div><div class="tgrid">${board}</div>
+      <div class="hint">장면마다 퀴즈 10문제 중 8개 이상 맞히면 도장이 찍혀요</div></div>
+    <div class="subbar"><p class="sub">장면 ${scenes.length}개 · 문장 ${scenes.reduce((n, s) => n + s.lines.length, 0)}개</p><button class="btn" data-act="talkQuiz">모든 장면 퀴즈</button></div>
+    <div class="tscenes">${cards}</div>`
+  }
+  const s = talkScene(state.talkScene), st = progress.talkStamps[s.id]
+  const lines = s.lines.map((l, i) => {
+    const jp = state.showCasual && l.casual ? l.casual : l.jp
+    const seen = progress.talkSeen.includes(`${s.id}:${i}`)
+    return `<div class="tline ${l.who}${seen ? ' seen' : ''}">
+      <div class="twho">${l.who === 'me' ? '나' : '상대'} · ${l.when}</div>
+      <div class="tbubble">
+        <span class="jp" lang="ja">${furi(jp)}</span>
+        <span class="ko">${l.ko}</span>
+        ${l.note ? `<span class="tnote">${l.note}</span>` : ''}
+        <button class="tspeak" data-act="speak" data-scene="${s.id}" data-i="${i}" aria-label="읽어 주기">${SPEAK_ICON}</button>
+      </div></div>`
+  }).join('')
+  return `
+  <div class="tdetailhead"><button class="btn icon-only" data-act="talkBack" aria-label="장면 목록으로">${icon('left')}</button>
+    <span class="tmark" lang="ja">${s.mark}</span><div><b>${s.name}</b><small>${s.desc}</small></div>${st ? '<span class="tdone" lang="ja">済</span>' : ''}</div>
+  <div class="subbar"><button class="btn${state.showCasual ? ' on' : ''}" data-act="talkCasual">${state.showCasual ? '존댓말로 보기' : '반말로 보기'}</button><button class="btn pri" data-act="talkQuiz">${st ? '장면 퀴즈 다시' : '장면 퀴즈 · 도장 받기'}</button></div>
+  <div class="panel tlines">${lines}</div>
+  <p class="locknote">스피커를 누르면 일본어로 읽어 줘요 · 무음 모드에서는 소리가 안 날 수 있어요</p>`
+}
+
 // ───── 퀘스트 지도 ─────
 const LOCK = '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 11V7a5 5 0 0 1 10 0v4 M5 11h14v10H5z"/></svg>'
 function starsHTML(n) { return `<span class="stars" aria-label="별 ${n}개">${[1, 2, 3].map(k => `<i class="${k <= n ? 'on' : ''}">★</i>`).join('')}</span>` }
@@ -981,7 +1042,7 @@ function quizHeader() {
       <div class="stagename"><small>${sc.name}</small><b>${st.name}</b></div>
       <span class="stagegoal">${PASS}개 이상 통과</span></div>`
   }
-  const modes = [['verb', '동사'], ['kanji', '한자'], ['grammar', '문법']]
+  const modes = [['verb', '동사'], ['kanji', '한자'], ['grammar', '문법'], ['talk', '회화']]
     .map(([m, label]) => `<button class="${state.quizMode === m ? 'on' : ''}" data-act="quizMode" data-mode="${m}">${label}</button>`).join('')
   const back = `<button class="btn icon-only" data-act="quizTab" data-tab="quest" aria-label="퀘스트 지도로">${icon('left')}</button>`
   // 한 줄로: [←][동사 | 한자 | 문법] + 동사는 수준, 한자는 학년, 문법은 급수 고르기
@@ -989,6 +1050,8 @@ function quizHeader() {
     ? `<select class="gradesel" data-act="verbLevelSel" aria-label="동사 수준 고르기">${['all', 'elem', 'mid', 'high'].map(l => { const lock = l !== 'all' && !isOpen('verb', l); return `<option value="${l}" ${state.verbQuizLevel === l ? 'selected' : ''}${lock ? ' disabled' : ''}>${l === 'all' ? '열린 동사 전체' : `${VERB_LEVELS[l]} 동사${lock ? ' (잠김)' : ''}`}</option>` }).join('')}</select>`
     : state.quizMode === 'kanji'
     ? `<select class="gradesel" data-act="quizGradeSel" aria-label="학년 고르기">${[0, ...kanjiGrades()].map(g => { const lock = g > 0 && !isOpen('kanji', g); return `<option value="${g}" ${state.quizGrade === g ? 'selected' : ''}${lock ? ' disabled' : ''}>${g ? (g <= 6 ? `초등 ${g}학년` : g <= 9 ? `중학 ${g - 6}묶음` : gradeLong(g)) + (lock ? ' (잠김)' : '') : '열린 한자 전체'}</option>` }).join('')}</select>`
+    : state.quizMode === 'talk'
+    ? `<select class="gradesel" data-act="talkQuizSel" aria-label="장면 고르기"><option value="all">모든 장면</option>${(typeof TALK === 'undefined' ? [] : TALK).map(s => `<option value="${s.id}" ${state.talkQuiz === s.id ? 'selected' : ''}>${s.name}${progress.talkStamps[s.id] ? ' · 도장' : ''}</option>`).join('')}</select>`
     : state.quizMode === 'grammar'
     ? `<select class="gradesel" data-act="quizLevelSel" aria-label="급수 고르기">${[...LEVELS, 'all', 'saved'].map(l => { const lock = LEVELS.includes(l) && !isOpen('grammar', l); return `<option value="${l}" ${state.quizLevel === l ? 'selected' : ''}${lock ? ' disabled' : ''}>${l === 'all' ? '열린 급수 전체' : l === 'saved' ? `★ 저장한 문법 (${progress.savedGrammar.length})` : l + (lock ? ' (잠김)' : '')}</option>` }).join('')}</select>`
     : ''
@@ -1077,6 +1140,8 @@ function quizDoneView() {
         <div class="stat"><b class="num">${qz.best}</b><small>최고 연속</small></div>
       </div>
     </div>
+    ${qz.newStamp ? `<div class="talkstampwin"><span class="tstamp big" lang="ja">${qz.newStamp.mark}</span><div><b>${qz.newStamp.name} 도장</b><small>장면 도장 ${Object.keys(progress.talkStamps).length} / ${TALK.length}</small></div></div>` : ''}
+    ${state.quizMode === 'talk' && state.talkQuiz !== 'all' && !qz.newStamp && !progress.talkStamps[state.talkQuiz] ? `<p class="locknote">10문제 중 8개 이상 맞히면 장면 도장을 받아요</p>` : ''}
     ${rewardsHTML(qz)}
     ${list}
     <div class="actions"><button class="btn pri" data-act="restartQuiz">다시 풀기</button><button class="btn" data-go="home">처음으로</button></div>
@@ -1091,8 +1156,8 @@ function pick(i) {
   qz.picked = i
   const q = qz.list[qz.i]
   const m = q.mode || state.quizMode
-  const learned = m === 'kanji' ? 'learnedKanji' : m === 'grammar' ? 'learnedGrammar' : 'learnedForms'
-  const wrong = m === 'kanji' ? 'wrongKanji' : m === 'grammar' ? 'wrongGrammar' : 'wrong'
+  const learned = m === 'kanji' ? 'learnedKanji' : m === 'grammar' ? 'learnedGrammar' : m === 'talk' ? 'learnedTalk' : 'learnedForms'
+  const wrong = m === 'kanji' ? 'wrongKanji' : m === 'grammar' ? 'wrongGrammar' : m === 'talk' ? 'wrongTalk' : 'wrong'
   const ok = q.choices[i].ok
   if (ok) {
     qz.right++
@@ -1109,6 +1174,7 @@ function pick(i) {
   }
   saveProgress()
   render()
+  if (m === 'talk') { const l = talkLineOf(q.key); if (l) setTimeout(() => speakJa(l.jp), 350) }
   if (ok) {
     const gain = qz.combo >= 3 ? 15 : 10
     qz.xp += gain
@@ -1123,7 +1189,7 @@ function pick(i) {
 }
 
 // ───── 이벤트 ─────
-const VIEWS = { home: homeView, kanji: kanjiView, cards: cardsView, conj: conjView, grammar: grammarView, quiz: quizPage }
+const VIEWS = { home: homeView, kanji: kanjiView, cards: cardsView, conj: conjView, grammar: grammarView, talk: talkView, quiz: quizPage }
 
 function startStage(id) {
   state.stage = id; state.quizMode = 'stage'; state.view = 'quiz'; state.kanji = null
@@ -1194,6 +1260,9 @@ const ACTIONS = {
         if (qz.stars && st.boss && !progress.graduated.includes(st.school)) { progress.graduated.push(st.school); qz.graduated = true }
         bonus = qz.stars * 10 + (qz.graduated ? 100 : 0)
       }
+      if (state.quizMode === 'talk' && state.talkQuiz !== 'all' && qz.right >= Math.ceil(qz.list.length * 0.8) && !progress.talkStamps[state.talkQuiz]) {
+        progress.talkStamps[state.talkQuiz] = todayStr(); qz.newStamp = talkScene(state.talkQuiz); bonus += 30
+      }
       qz.xp += 20 + bonus
       bumpToday('quizzes')
       qz.newBadges = checkBadges()
@@ -1212,6 +1281,20 @@ const ACTIONS = {
   quizMode(btn) { state.quizMode = btn.dataset.mode; newQuiz() },
   quizGrade(btn) { state.quizGrade = Number(btn.dataset.grade); newQuiz() },
   restartQuiz() { newQuiz() },
+  talkOpen(btn) { state.talkScene = btn.dataset.id; SFX.tap(); window.scrollTo(0, 0) },
+  talkBack() { state.talkScene = null; window.scrollTo(0, 0) },
+  talkCasual() { state.showCasual = !state.showCasual; SFX.tap() },
+  talkQuiz() { state.quizMode = 'talk'; state.talkQuiz = state.talkScene || 'all'; state.quizTab = 'free'; go('quiz'); return true },
+  speak(btn) {
+    const s = talkScene(btn.dataset.scene), l = s && s.lines[Number(btn.dataset.i)]
+    if (!l) return true
+    speakJa(state.showCasual && l.casual ? l.casual : l.jp)
+    const k = `${s.id}:${btn.dataset.i}`
+    if (!progress.talkSeen.includes(k)) { progress.talkSeen.push(k); addXP(1); saveProgress() }
+    btn.classList.add('on'); setTimeout(() => btn.classList.remove('on'), 900)
+    btn.closest('.tline')?.classList.add('seen')
+    return true
+  },
   place(btn) { const qz = state.quiz; if (qz.picked !== null) return true; qz.built.push(Number(btn.dataset.p)); SFX.tap() },
   unplace(btn) { const qz = state.quiz; if (qz.picked !== null) return true; qz.built.splice(Number(btn.dataset.k), 1); SFX.tap() },
   checkOrder() {
@@ -1292,6 +1375,7 @@ document.addEventListener('change', e => {
   if (e.target.matches('select[data-act="pickCard"]')) { ACTIONS.pickCard(e.target); render() }
   if (e.target.matches('select[data-act="quizGradeSel"]')) { state.quizGrade = Number(e.target.value); newQuiz(); render() }
   if (e.target.matches('select[data-act="quizLevelSel"]')) { state.quizLevel = e.target.value; newQuiz(); render() }
+  if (e.target.matches('select[data-act="talkQuizSel"]')) { state.talkQuiz = e.target.value; newQuiz(); render() }
   if (e.target.matches('select[data-act="verbLevelSel"]')) { state.verbQuizLevel = e.target.value; newQuiz(); render() }
 })
 
