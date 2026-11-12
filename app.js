@@ -1,6 +1,6 @@
 // ───── 진도 저장 (localStorage) ─────
 const STORE_KEY = 'jp-study-progress'
-const EMPTY = { seen: {}, seenKanji: [], learnedForms: [], wrong: [], learnedKanji: [], wrongKanji: [], lastStudy: '', studyDays: [], today: { date: '', cards: 0, quizzes: 0, xp: 0 }, xp: 0, sound: true, music: true, savedGrammar: [], seenHigh: [], seenGrammar: [], learnedGrammar: [], wrongGrammar: [], stages: {}, graduated: [], badges: [], bestCombo: 0, musicVol: 1, sfxVol: 1, buddy: 'mike' }
+const EMPTY = { seen: {}, seenKanji: [], learnedForms: [], wrong: [], learnedKanji: [], wrongKanji: [], lastStudy: '', studyDays: [], today: { date: '', cards: 0, quizzes: 0, xp: 0 }, xp: 0, sound: true, music: true, savedGrammar: [], seenHigh: [], seenGrammar: [], learnedGrammar: [], wrongGrammar: [], stages: {}, graduated: [], badges: [], bestCombo: 0, musicVol: 1, sfxVol: 1, buddy: 'mike', track: 'all' }
 
 function loadProgress() {
   try { return { ...EMPTY, ...JSON.parse(localStorage.getItem(STORE_KEY) || '{}') } }
@@ -101,32 +101,65 @@ function playSfx(name) {
 }
 const SFX = Object.fromEntries(Object.keys(SFX_DEF).map(n => [n, () => playSfx(n)]))
 
-// 배경음악: 파일 자체를 작게(-26 LUFS) 만들어 두었으므로 오디오 플레이어로 바로 튼다
-// 처음에는 mp3를 그대로 쓰고(풀기 전), 다 풀리면 음량을 곱한 WAV로 바꾼다.
+// 배경음악: 11곡. 파일 자체를 작게(-26 LUFS) 만들어 두었다.
+// 곡을 받으면 처음에는 mp3를 그대로 틀고, 다 풀리면 음량을 곱한 WAV로 바꾼다.
 // 푸는 일(OfflineAudioContext)은 소리를 내지 않으므로 무음 모드와 상관없다.
+const TRACKS = [
+  { file: 'audio/bgm.mp3', name: '벚꽃 교실' },
+  { file: 'audio/bgm-01.mp3', name: '벚꽃 산책' },
+  { file: 'audio/bgm-02.mp3', name: '여름 축제' },
+  { file: 'audio/bgm-03.mp3', name: '비 오는 도서관' },
+  { file: 'audio/bgm-04.mp3', name: '별밤 기차' },
+  { file: 'audio/bgm-05.mp3', name: '아침 등굣길' },
+  { file: 'audio/bgm-06.mp3', name: '교토 찻집' },
+  { file: 'audio/bgm-07.mp3', name: '눈 오는 날' },
+  { file: 'audio/bgm-08.mp3', name: '바다 마을' },
+  { file: 'audio/bgm-09.mp3', name: '집중 모드' },
+  { file: 'audio/bgm-10.mp3', name: '픽셀 모험' },
+]
+// 한 파일로 묶은 페이지(claude.ai 링크)에는 첫 곡만 들어 있다
+const TRACK_LIST = window.APP_AUDIO ? [0] : TRACKS.map((_, i) => i)
 let bgm = null, bgmURL = null, bgmRawURL = null, bgmPCM = null, bgmRate = 22050
-;(function preloadBgm() {
+let trackNow = -1, trackLoading = 0
+// progress.track: 'all' = 모든 곡 차례로(섞어서), 숫자 = 그 곡만 반복
+function trackMode() { const t = progress.track ?? 'all'; return t === 'all' || !TRACK_LIST.includes(Number(t)) ? 'all' : Number(t) }
+let shuffleOrder = []
+function nextTrackIndex() {
+  const m = trackMode()
+  if (m !== 'all') return m
+  if (!shuffleOrder.length) shuffleOrder = shuffle(TRACK_LIST.filter(i => i !== trackNow))
+  return shuffleOrder.shift() ?? TRACK_LIST[0]
+}
+// 곡 하나를 받아 준비한다 (play: 준비되면 이어서 틀지)
+function loadTrack(i, play) {
+  const job = ++trackLoading
+  trackNow = i; bgmPCM = null
   const ready = blob => {
+    if (job !== trackLoading) return
+    if (bgmURL && bgmURL !== bgmRawURL) URL.revokeObjectURL(bgmURL)
+    if (bgmRawURL) URL.revokeObjectURL(bgmRawURL)
     bgmRawURL = bgmURL = URL.createObjectURL(blob)
-    blob.arrayBuffer().then(decodeBgm).catch(() => {})
+    if (bgm) { bgm.src = bgmURL; try { bgm.volume = progress.musicVol ?? 1 } catch { /* 아이폰 */ } if (play) bgm.play().catch(() => {}) }
+    blob.arrayBuffer().then(b => decodeBgm(b, job)).catch(() => {})
+    updateNowPlaying()
   }
-  // 한 파일로 묶은 페이지(claude.ai 링크)에는 음악이 글자로 들어 있어 직접 풀어 쓴다
   if (window.APP_AUDIO) {
     try {
       const bin = atob(window.APP_AUDIO.split(',')[1]), bytes = new Uint8Array(bin.length)
-      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
+      for (let k = 0; k < bin.length; k++) bytes[k] = bin.charCodeAt(k)
       ready(new Blob([bytes], { type: 'audio/mpeg' }))
     } catch { /* 음악 없이 */ }
     return
   }
-  fetch('audio/bgm.mp3').then(r => r.ok ? r.blob() : null).then(b => { if (b) ready(b) }).catch(() => {})
-})()
-async function decodeBgm(arrayBuf) {
+  fetch(TRACKS[i].file).then(r => r.ok ? r.blob() : null).then(b => { if (b) ready(b) }).catch(() => {})
+}
+async function decodeBgm(arrayBuf, job) {
   try {
     const AC = window.OfflineAudioContext || window.webkitOfflineAudioContext
     if (!AC) return
     const ctx = new AC(1, 1, 22050)
     const audio = await new Promise((res, rej) => { const p = ctx.decodeAudioData(arrayBuf, res, rej); if (p && p.then) p.then(res, rej) })
+    if (job !== trackLoading) return
     const n = audio.length, ch = audio.numberOfChannels, mono = new Float32Array(n)
     for (let c = 0; c < ch; c++) { const d = audio.getChannelData(c); for (let i = 0; i < n; i++) mono[i] += d[i] / ch }
     bgmPCM = mono; bgmRate = audio.sampleRate
@@ -148,14 +181,46 @@ function rebuildBgm() {
   bgm.addEventListener('loadedmetadata', () => { try { bgm.currentTime = t % (bgm.duration || 1e9) } catch { /* 처음부터 */ } }, { once: true })
   if (playing) bgm.play().catch(() => {})
 }
-
+// 곡이 끝나면: 한 곡 반복이면 처음부터, 아니면 다음 곡
+function onTrackEnd() {
+  if (trackMode() !== 'all') { bgm.currentTime = 0; bgm.play().catch(() => {}); return }
+  loadTrack(nextTrackIndex(), true)
+}
+// 같은 오디오 플레이어를 계속 쓴다 (아이폰은 한 번 화면을 눌러 튼 플레이어만 나중에 저절로 틀 수 있다)
 function playBgm() {
-  if (!bgmURL || !progress.music) return
+  if (!progress.music) return
   try {
-    if (!bgm) { bgm = new Audio(bgmURL); bgm.loop = true; bgm.setAttribute('playsinline', ''); try { bgm.volume = bgmPCM ? 1 : (progress.musicVol ?? 1) } catch { /* 아이폰 */ } }
+    if (!bgm) {
+      bgm = new Audio(); bgm.setAttribute('playsinline', '')
+      bgm.addEventListener('ended', onTrackEnd)
+      if (bgmURL) bgm.src = bgmURL
+    }
+    if (!bgmURL) { loadTrack(trackNow >= 0 ? trackNow : nextTrackIndex(), true); return }
     bgm.play().catch(() => {})
   } catch { /* 소리를 낼 수 없는 기기 */ }
 }
+// 곡 고르기 / 다음 곡
+function chooseTrack(mode) {
+  progress.track = mode; saveProgress()
+  shuffleOrder = []
+  const i = mode === 'all' ? nextTrackIndex() : Number(mode)
+  if (i === trackNow && bgm && !bgm.paused) return
+  loadTrack(i, progress.music && !!bgm)
+  if (progress.music && !bgm) playBgm()
+}
+function skipTrack() {
+  if (trackMode() !== 'all') { progress.track = 'all'; saveProgress() }
+  loadTrack(nextTrackIndex(), progress.music)
+  if (progress.music && !bgm) playBgm()
+}
+function updateNowPlaying() {
+  const el = document.getElementById('nowplaying')
+  if (el) el.textContent = trackNow >= 0 ? TRACKS[trackNow].name : ''
+  const sel = document.getElementById('tracksel')
+  if (sel) sel.value = String(trackMode())
+}
+// 첫 곡은 미리 받아 둔다 (화면을 누르면 바로 나오게)
+loadTrack(window.APP_AUDIO ? 0 : nextTrackIndex(), false)
 function stopBgm() { if (bgm) bgm.pause() }
 
 // 아이폰은 사용자가 화면을 누를 때만 소리를 시작할 수 있어서, 누를 때마다 배경음악이 꺼져 있으면 다시 켠다
@@ -1225,7 +1290,12 @@ function toggleSoundPanel() {
   el.setAttribute('aria-label', '소리 설정')
   const draw = () => {
     el.innerHTML = `<div class="sp-head"><b>소리 설정</b><button class="sp-close" data-close aria-label="닫기"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12 M18 6 6 18"/></svg></button></div>
-      ${volRow('music', '배경음악')}${volRow('sfx', '효과음')}
+      ${volRow('music', '배경음악')}
+      ${TRACK_LIST.length > 1 ? `<div class="sp-track">
+        <select id="tracksel" aria-label="곡 고르기"><option value="all" ${trackMode() === 'all' ? 'selected' : ''}>모든 곡 섞어 듣기</option>${TRACK_LIST.map(i => `<option value="${i}" ${trackMode() === i ? 'selected' : ''}>${TRACKS[i].name} (한 곡 반복)</option>`).join('')}</select>
+        <button class="sp-next" data-skip aria-label="다음 곡"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5l9 7-9 7z M18 5v14"/></svg></button></div>
+        <p class="sp-now">지금 · <b id="nowplaying">${trackNow >= 0 ? TRACKS[trackNow].name : ''}</b></p>` : ''}
+      ${volRow('sfx', '효과음')}
       <p class="sp-note">0으로 내리면 꺼져요 · 전체 크기는 폰 음량 버튼으로</p>`
   }
   draw()
@@ -1238,12 +1308,14 @@ function toggleSoundPanel() {
     row.querySelector('.sp-mute path').setAttribute('d', VOL_ICON[row.dataset.kind](v > 0))
   })
   el.addEventListener('change', e => {
+    if (e.target.id === 'tracksel') { chooseTrack(e.target.value === 'all' ? 'all' : Number(e.target.value)); return }
     const r = e.target.closest('input[type=range]'); if (!r) return
     setVol(r.closest('.sp-row').dataset.kind, Number(r.value) / 100, true)
   })
   el.addEventListener('click', e => {
     e.stopPropagation()
     if (e.target.closest('[data-close]')) { el.remove(); return }
+    if (e.target.closest('[data-skip]')) { skipTrack(); SFX.tap(); return }
     const m = e.target.closest('[data-mute]')
     if (m) {
       const kind = m.dataset.mute
