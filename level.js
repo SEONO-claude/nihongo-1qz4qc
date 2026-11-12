@@ -49,6 +49,35 @@ function rankName() {
   return `${schoolOf(st.school).name} ${st.boss ? '졸업반' : st.name}`
 }
 
+// ───── 고양이 친구들: 퀘스트 스테이지를 처음 통과하면 한 마리씩 친구가 된다 ─────
+// at: 이 스테이지를 통과하면 친구가 됨 (미케는 처음부터)
+const CATS = [
+  { id: 'mike', name: '미케', jp: 'ミケ', mean: '삼색', kind: '삼색 고양이', at: null },
+  { id: 'kuro', name: '쿠로', jp: 'クロ', mean: '검정', kind: '검은 고양이', at: 'e1' },
+  { id: 'shiro', name: '시로', jp: 'シロ', mean: '하양', kind: '흰 고양이', at: 'e2' },
+  { id: 'mikan', name: '미캉', jp: 'ミカン', mean: '귤', kind: '치즈냥이', at: 'e3' },
+  { id: 'moka', name: '모카', jp: 'モカ', mean: '모카 커피', kind: '샴고양이', at: 'e4' },
+  { id: 'hachi', name: '하치', jp: 'ハチ', mean: '팔(八) 자 무늬', kind: '턱시도 고양이', at: 'e6' },
+  { id: 'gin', name: '긴', jp: 'ギン', mean: '은', kind: '러시안 블루', at: 'ef' },
+  { id: 'tora', name: '토라', jp: 'トラ', mean: '호랑이', kind: '고등어 태비', at: 'm2' },
+  { id: 'maru', name: '마루', jp: 'マル', mean: '동그라미', kind: '스코티시 폴드', at: 'mf' },
+  { id: 'sabi', name: '사비', jp: 'サビ', mean: '녹슨 빛 무늬', kind: '카오스 고양이', at: 'h2' },
+  { id: 'mofu', name: '모후', jp: 'モフ', mean: '복슬복슬', kind: '메인쿤', at: 'hf' },
+]
+function catById(id) { return CATS.find(c => c.id === id) || CATS[0] }
+function catOpen(c) { return !c.at || stageCleared(c.at) }
+function buddy() { const c = catById(progress.buddy); return catOpen(c) ? c : CATS[0] }
+function catImage(c) { return c.id === 'mike' ? IMAGES.mascot : IMAGES['cat-' + c.id] }
+// "초등학교 3학년 통과"
+function catHint(c) { const st = STAGES[stageIndex(c.at)]; return `${schoolOf(st.school).name} ${st.name} 통과` }
+function catCard(c) {
+  const open = catOpen(c), on = buddy().id === c.id
+  return `<button class="catcard${open ? '' : ' locked'}${on ? ' on' : ''}" ${open ? `data-act="setBuddy" data-id="${c.id}"` : 'disabled'} aria-label="${open ? `${c.name} 단짝으로` : `잠김 · ${catHint(c)}`}">
+    <img src="${catImage(c)}" alt="" width="400" height="400">
+    ${on ? '<span class="buddytag">단짝</span>' : ''}
+    <b>${open ? c.name : '???'}</b><small>${open ? c.kind : catHint(c)}</small></button>`
+}
+
 // ───── 배지 ─────
 // mark: 도장에 새길 한자 한 글자
 const BADGES = [
@@ -89,10 +118,15 @@ function lockedPanel(title, hint) {
 // "새로 열렸어요" + "새 배지" (퀴즈 결과 화면)
 function rewardsHTML(qz) {
   const un = qz.unlocked || [], bs = qz.newBadges || []
-  if (!un.length && !bs.length) return ''
+  if (!un.length && !bs.length && !qz.newCat) return ''
+  const c = qz.newCat
   return `<div class="rewards">
+    ${c ? `<div class="newcat"><div class="eyebrow">새 친구가 생겼어요</div>
+      <img src="${catImage(c)}" alt="${c.name}" width="400" height="400">
+      <b>${c.name} <span lang="ja">${c.jp}</span></b><small>${c.kind} · 이름 뜻 「${c.mean}」</small>
+      ${buddy().id === c.id ? '<span class="buddytag">단짝</span>' : `<button class="btn" data-act="setBuddy" data-id="${c.id}">단짝으로 정하기</button>`}</div>` : ''}
     ${un.length ? `<div class="newopen"><div class="eyebrow">새로 열렸어요</div>
-      <ul>${un.map((u, i) => `<li style="--d:${600 + i * 180}ms"><span class="ktag ${u.kind}">${{ stage: '퀘스트', kanji: '한자', verb: '동사', grammar: '문법' }[u.kind]}</span>${u.label}</li>`).join('')}</ul></div>` : ''}
+      <ul>${un.map((u, i) => `<li style="--d:${600 + i * 180}ms"><span class="ktag ${u.kind}">${{ stage: '퀘스트', kanji: '한자', verb: '동사', grammar: '문법', cat: '친구' }[u.kind]}</span>${u.label}</li>`).join('')}</ul></div>` : ''}
     ${bs.length ? `<div class="newbadges"><div class="eyebrow">새 배지</div><div class="badges">${bs.map(b => badgeHTML(b, true, true)).join('')}</div></div>` : ''}
   </div>`
 }

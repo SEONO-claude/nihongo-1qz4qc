@@ -1,6 +1,6 @@
 // ───── 진도 저장 (localStorage) ─────
 const STORE_KEY = 'jp-study-progress'
-const EMPTY = { seen: {}, seenKanji: [], learnedForms: [], wrong: [], learnedKanji: [], wrongKanji: [], lastStudy: '', studyDays: [], today: { date: '', cards: 0, quizzes: 0, xp: 0 }, xp: 0, sound: true, music: true, savedGrammar: [], seenHigh: [], seenGrammar: [], learnedGrammar: [], wrongGrammar: [], stages: {}, graduated: [], badges: [], bestCombo: 0, musicVol: 1, sfxVol: 1 }
+const EMPTY = { seen: {}, seenKanji: [], learnedForms: [], wrong: [], learnedKanji: [], wrongKanji: [], lastStudy: '', studyDays: [], today: { date: '', cards: 0, quizzes: 0, xp: 0 }, xp: 0, sound: true, music: true, savedGrammar: [], seenHigh: [], seenGrammar: [], learnedGrammar: [], wrongGrammar: [], stages: {}, graduated: [], badges: [], bestCombo: 0, musicVol: 1, sfxVol: 1, buddy: 'mike' }
 
 function loadProgress() {
   try { return { ...EMPTY, ...JSON.parse(localStorage.getItem(STORE_KEY) || '{}') } }
@@ -214,12 +214,16 @@ const IMAGES = window.APP_IMAGES || {
   mascot: 'images/mascot.webp', think: 'images/mascot-think.webp', cheer: 'images/mascot-cheer.webp',
   sad: 'images/mascot-sad.webp', party: 'images/mascot-party.webp',
 }
+// 고양이 친구들 (묶은 페이지에서는 APP_IMAGES에 이미 들어 있다)
+for (const id of ['kuro', 'shiro', 'mikan', 'moka', 'hachi', 'gin', 'tora', 'maru', 'sabi', 'mofu']) IMAGES['cat-' + id] = IMAGES['cat-' + id] || `images/cat-${id}.webp`
 // 미케 그림 (포즈가 없으면 기본 모습)
 function mascot(mood = 'mascot', cls = 'mascot') {
-  const src = IMAGES[mood] || IMAGES.mascot
-  return src ? `<img class="${cls}" src="${src}" alt="미케" width="320" height="320">` : ''
+  // 단짝이 미케가 아니면 그 고양이가 나온다 (표정 그림은 미케만 있음)
+  const b = typeof buddy === 'function' ? buddy() : { id: 'mike', name: '미케' }
+  const src = b.id === 'mike' ? (IMAGES[mood] || IMAGES.mascot) : catImage(b)
+  return src ? `<img class="${cls}" src="${src}" alt="${b.name}" width="320" height="320">` : ''
 }
-const CHEERS = ['정답이에요', '잘했어요', '완벽해요', '좋아요, 그대로 가요', '역시 미케 친구']
+const CHEERS = ['정답이에요', '잘했어요', '완벽해요', '좋아요, 그대로 가요', '역시 내 친구']
 const ENCOURAGE = ['괜찮아요, 다음엔 맞힐 거예요', '아깝다, 한 번 더 봐요', '틀려도 괜찮아요', '이제 기억했죠']
 const pickOne = list => list[Math.floor(Math.random() * list.length)]
 
@@ -380,7 +384,8 @@ function homeView() {
 
   // 다음 목표: 지금 스테이지를 통과하면 무엇이 열리는지
   const after = STAGES[currentStageIndex() + 1]
-  const prizes = after && !allClear ? [{ kind: 'stage', label: `퀘스트 ${schoolOf(after.school).name} ${after.name}` }, ...unlocksAt(after.id)] : []
+  const prizeCat = CATS.find(c => c.at === nextSt.id)
+  const prizes = after && !allClear ? [{ kind: 'stage', label: `퀘스트 ${schoolOf(after.school).name} ${after.name}` }, ...(prizeCat ? [{ kind: 'cat', label: `새 친구 고양이` }] : []), ...unlocksAt(after.id)] : []
   const nextGoal = allClear ? '' : `
   <div class="panel nextgoal">
     <div class="eyebrow">다음 목표 <span class="num">· Lv.${playerLevel() + 1}까지</span></div>
@@ -455,6 +460,7 @@ function homeView() {
   </div>
   <div class="panel">
     <div class="hd">지금까지</div>
+    ${bar('고양이 친구', CATS.filter(catOpen).length, CATS.length)}
     ${bar('딴 배지', progress.badges.length, BADGES.length)}
     ${bar('한자 전체', allK, totalK)}
     ${bar('중학 한자', progress.seenKanji.filter(c => KANJI[c] && KANJI[c].grade >= 7).length, Object.values(KANJI).filter(k => k.grade >= 7).length || 1110)}
@@ -836,6 +842,11 @@ function questView() {
     <p>모은 별 <b class="num">${totalStars}</b> / ${STAGES.length * 3} · 배지 <b class="num">${progress.badges.length}</b> / ${BADGES.length}</p></div></div>
   <div class="questbar"><button class="btn pri" data-act="questContinue">이어서 도전</button><button class="btn" data-act="quizTab" data-tab="free">자유 연습</button></div>
   ${schools}
+  <section class="panel catbox">
+    <div class="hd">고양이 친구들<span class="num">${CATS.filter(catOpen).length} / ${CATS.length}</span></div>
+    <p class="cathint">친구를 누르면 단짝이 돼요 · 단짝은 홈과 퀴즈에서 함께해요</p>
+    <div class="cats">${CATS.map(catCard).join('')}</div>
+  </section>
   <section class="panel badgebox">
     <div class="hd">배지<span class="num">${progress.badges.length} / ${BADGES.length}</span></div>
     <div class="badges">${BADGES.map(b => badgeHTML(b, progress.badges.includes(b.id))).join('')}</div>
@@ -1077,6 +1088,7 @@ const ACTIONS = {
         const next = STAGES[stageIndex(st.id) + 1]
         if (firstClear && next) qz.unlocked = [{ kind: 'stage', label: `${schoolOf(next.school).name} ${next.name}` }, ...unlocksAt(next.id)]
         if (firstClear) qz.levelUp = playerLevel()
+        if (firstClear) qz.newCat = CATS.find(c => c.at === st.id)
         if (qz.stars && st.boss && !progress.graduated.includes(st.school)) { progress.graduated.push(st.school); qz.graduated = true }
         bonus = qz.stars * 10 + (qz.graduated ? 100 : 0)
       }
@@ -1098,6 +1110,16 @@ const ACTIONS = {
   quizMode(btn) { state.quizMode = btn.dataset.mode; newQuiz() },
   quizGrade(btn) { state.quizGrade = Number(btn.dataset.grade); newQuiz() },
   restartQuiz() { newQuiz() },
+  setBuddy(btn) {
+    const c = catById(btn.dataset.id)
+    if (!catOpen(c)) return true
+    progress.buddy = c.id; saveProgress()
+    render()
+    const card = document.querySelector(`.catcard[data-id="${c.id}"]`) || document.querySelector('.newcat')
+    if (card) { const [x, y] = centerOf(card); confetti(x, y, 24) }
+    SFX.good()
+    return true
+  },
   kanjiQuiz() { if (!isOpen('kanji', state.grade)) return; state.quizMode = 'kanji'; state.quizGrade = state.grade; go('quiz'); return true },
   pickCard(el) { state.cardIdx[state.cardType] = Number(el.value); state.kanji = null; markSeen() },
   conjGroup(btn) { state.conjGroup = Number(btn.dataset.group) },
@@ -1251,7 +1273,7 @@ function showOpening() {
     <div class="op-cell">
       <div class="op-inner">
         <svg class="op-guide" viewBox="0 0 100 100" aria-hidden="true"><path d="M50 4V96" pathLength="1"/><path d="M4 50H96" pathLength="1"/></svg>
-        <img class="op-mascot" src="${IMAGES.mascot}" alt="" width="320" height="320">
+        <img class="op-mascot" src="${catImage(buddy())}" alt="" width="320" height="320">
       </div>
       <span class="op-hanko" lang="ja">日</span>
     </div>

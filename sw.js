@@ -1,6 +1,6 @@
 // 오프라인용 서비스 워커: 앱 파일을 폰에 저장해 두고 인터넷 없이도 연다.
 // 인터넷이 될 때는 항상 새 파일을 받고, 그 사본을 저장해 둔다.
-const VERSION = 'v26'
+const VERSION = 'v27'
 const CACHE = `nihongo-${VERSION}`
 const FILES = [
   './',
@@ -27,6 +27,16 @@ const FILES = [
   './images/mascot-cheer.webp',
   './images/mascot-sad.webp',
   './images/mascot-party.webp',
+  './images/cat-kuro.webp',
+  './images/cat-shiro.webp',
+  './images/cat-mikan.webp',
+  './images/cat-moka.webp',
+  './images/cat-hachi.webp',
+  './images/cat-gin.webp',
+  './images/cat-tora.webp',
+  './images/cat-maru.webp',
+  './images/cat-sabi.webp',
+  './images/cat-mofu.webp',
   './audio/bgm.mp3',
 ]
 
