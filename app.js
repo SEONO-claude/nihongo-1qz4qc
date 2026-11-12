@@ -1,6 +1,6 @@
 // ───── 진도 저장 (localStorage) ─────
 const STORE_KEY = 'jp-study-progress'
-const EMPTY = { seen: {}, seenKanji: [], learnedForms: [], wrong: [], learnedKanji: [], wrongKanji: [], lastStudy: '', studyDays: [], today: { date: '', cards: 0, quizzes: 0, xp: 0 }, xp: 0, sound: true, music: true, savedGrammar: [], seenGrammar: [], learnedGrammar: [], wrongGrammar: [], stages: {}, graduated: [] }
+const EMPTY = { seen: {}, seenKanji: [], learnedForms: [], wrong: [], learnedKanji: [], wrongKanji: [], lastStudy: '', studyDays: [], today: { date: '', cards: 0, quizzes: 0, xp: 0 }, xp: 0, sound: true, music: true, savedGrammar: [], seenHigh: [], seenGrammar: [], learnedGrammar: [], wrongGrammar: [], stages: {}, graduated: [] }
 
 function loadProgress() {
   try { return { ...EMPTY, ...JSON.parse(localStorage.getItem(STORE_KEY) || '{}') } }
@@ -408,8 +408,40 @@ function kanjiList(grade) {
   return Object.keys(KANJI).filter(c => KANJI[c].grade === grade)
 }
 
+function kanjiGrades() {
+  const g = [...new Set(Object.values(KANJI).map(k => k.grade))].sort((a, b) => a - b)
+  return [...g, ...[10, 11, 12].filter(x => highList(x).length)]
+}
+
+// 고등 한자: 단어 목록 (누르면 위에 읽기·뜻과 쓰인 한자 카드)
+function highView() {
+  const list = highList(state.grade)
+  const seen = list.filter(e => progress.seenHigh.includes(e[0])).length
+  const rows = list.map(([w, r, m]) => {
+    const cls = ['hkrow', progress.seenHigh.includes(w) ? 'seen' : '', state.kanji === w ? 'on' : ''].join(' ')
+    return `<button class="${cls}" data-kanji="${w}"><span class="hkw" lang="ja"><ruby>${w}<rt>${r}</rt></ruby></span><span class="hkm">${m}</span></button>`
+  }).join('')
+  const open = list.find(e => e[0] === state.kanji)
+  const detail = open ? `<div class="panel" id="kdetail">
+      <div class="hkhead"><span class="hkbig" lang="ja"><ruby>${open[0]}<rt>${open[1]}</rt></ruby></span><span class="hkm">${open[2]}</span></div>
+      ${kanjiInfo(open[0])}</div>` : ''
+  const tabs = kanjiGrades().map(g => `<button class="${g === state.grade ? 'on' : ''}" data-act="grade" data-grade="${g}">${gradeName(g)}</button>`).join('')
+  const NOTE = { 10: '단어 전체에 붙는 특수한 읽기예요. 한자 하나하나의 음으로는 읽을 수 없어요', 11: '네 글자로 된 관용 표현이에요', 12: '일본 사람도 자주 틀리는 읽기예요' }
+  return `
+  <section class="banner">
+    <img src="${IMAGES.kanji}" alt="벚꽃 핀 학교 가는 길, 돌담 위의 빨간 란도셀" width="1680" height="720">
+    <div class="banner-text"><h1>고등 한자</h1><p><span class="num">${progress.seenHigh.length} / ${[10, 11, 12].reduce((n, g) => n + highList(g).length, 0)}</span>개를 봤어요</p></div>
+  </section>
+  <div class="tabs">${tabs}</div>
+  <div class="subbar"><p class="sub">${gradeLong(state.grade)} ${list.length}개 · 본 단어 <span class="num">${seen} / ${list.length}</span></p><button class="btn" data-act="kanjiQuiz">${gradeName(state.grade)} 한자 퀴즈</button></div>
+  ${detail}
+  <div class="panel"><p class="hknote">${NOTE[state.grade]}</p><div class="hklist">${rows}</div>
+    <div class="hint">단어를 누르면 읽는 법과 쓰인 한자가 나와요 · 본 단어에는 빨간 점</div></div>`
+}
+
 function kanjiView() {
-  const grades = [...new Set(Object.values(KANJI).map(k => k.grade))].sort((a, b) => a - b)
+  if (state.grade >= 10) return highView()
+  const grades = kanjiGrades()
   const list = kanjiList(state.grade)
   const seen = list.filter(c => progress.seenKanji.includes(c)).length
   const tabs = grades.map(g => `<button class="${g === state.grade ? 'on' : ''}" data-act="grade" data-grade="${g}">${gradeName(g)}</button>`).join('')
@@ -739,7 +771,7 @@ function quizHeader() {
   const grades = state.quizMode === 'verb'
     ? `<select class="gradesel" data-act="verbLevelSel" aria-label="동사 수준 고르기">${['all', 'elem', 'mid', 'high'].map(l => `<option value="${l}" ${state.verbQuizLevel === l ? 'selected' : ''}>${l === 'all' ? '전체 동사' : `${VERB_LEVELS[l]} 동사`}</option>`).join('')}</select>`
     : state.quizMode === 'kanji'
-    ? `<select class="gradesel" data-act="quizGradeSel" aria-label="학년 고르기">${[0, ...new Set(Object.values(KANJI).map(k => k.grade))].sort((a, b) => a - b).map(g => `<option value="${g}" ${state.quizGrade === g ? 'selected' : ''}>${g ? (g <= 6 ? `초등 ${g}학년` : `중학 ${g - 6}묶음`) : '전체 한자'}</option>`).join('')}</select>`
+    ? `<select class="gradesel" data-act="quizGradeSel" aria-label="학년 고르기">${[0, ...kanjiGrades()].map(g => `<option value="${g}" ${state.quizGrade === g ? 'selected' : ''}>${g ? (g <= 6 ? `초등 ${g}학년` : g <= 9 ? `중학 ${g - 6}묶음` : gradeLong(g)) : '전체 한자'}</option>`).join('')}</select>`
     : state.quizMode === 'grammar'
     ? `<select class="gradesel" data-act="quizLevelSel" aria-label="급수 고르기">${[...LEVELS, 'all', 'saved'].map(l => `<option value="${l}" ${state.quizLevel === l ? 'selected' : ''}>${l === 'all' ? '전체 급수' : l === 'saved' ? `★ 저장한 문법 (${progress.savedGrammar.length})` : l}</option>`).join('')}</select>`
     : ''
@@ -958,6 +990,7 @@ function openKanji(el) {
     for (const ch of state.kanji) {
       if (KANJI[ch] && !progress.seenKanji.includes(ch)) progress.seenKanji.push(ch)
     }
+    if (state.grade >= 10 && state.view === 'kanji' && !progress.seenHigh.includes(state.kanji)) progress.seenHigh.push(state.kanji)
     saveProgress()
   }
   render()

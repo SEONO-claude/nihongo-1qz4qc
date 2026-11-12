@@ -95,8 +95,11 @@ const STAGES = SCHOOLS.flatMap(s => s.stages.map(st => ({ ...st, school: s.id })
 const PASS = 8   // 10문제 중 8개 이상이면 통과
 
 // 한자 학년 이름: 1~6 = 초등, 7~9 = 중1~중3 (중학 한자는 자주 쓰는 순으로 세 묶음)
-function gradeName(g) { return g <= 6 ? `${g}학년` : `중${g - 6}` }
-function gradeLong(g) { return g <= 6 ? `초등 ${g}학년` : `중학 한자 (중${g - 6})` }
+// 10~12 = 고1~고3 (특수 읽기 · 사자숙어 · 틀리기 쉬운 읽기 단어 목록)
+const HK_GRADE = { 10: 'jukuji', 11: 'yoji', 12: 'nandoku' }
+function gradeName(g) { return g <= 6 ? `${g}학년` : g <= 9 ? `중${g - 6}` : `고${g - 9}` }
+function gradeLong(g) { return g <= 6 ? `초등 ${g}학년` : g <= 9 ? `중학 한자 (중${g - 6})` : `고등 ${HK_SETS[HK_GRADE[g]]}` }
+function highList(g) { return typeof HIGH_KANJI === 'undefined' ? [] : HIGH_KANJI[HK_GRADE[g]] || [] }
 
 // ───── 고등 한자: 숙자훈 · 사자숙어 · 틀리기 쉬운 읽기 ─────
 // 문제 키 "hk:yoji:12:r" (읽기 고르기), "hk:yoji:12:m" (뜻 고르기)
@@ -310,6 +313,7 @@ function readIndexes(c, grade) {
 }
 
 function buildKanjiQuiz(grade, wrongKeys) {
+  if (grade >= 10) return pickKeys(wrongKeys, highKanjiKeys([HK_GRADE[grade]])).map(makeHighKanjiQuestion)
   const pool = kanjiPool(grade)
   const all = pool.flatMap(c => [`m:${c}`, ...readIndexes(c, grade).map(i => `r:${c}:${i}`)])
   return pickKeys(wrongKeys, all).map(k => k.startsWith('r:') ? makeReadQuestion(k, pool) : makeMeaningQuestion(k, pool))

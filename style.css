@@ -194,6 +194,18 @@ main { max-width: 640px; margin: 0 auto; padding: 28px 16px 96px; }
 @media (hover: hover) { .kcell:hover { background-color: var(--pink-t); transform: scale(1.06); z-index: 1; } }
 .kcell.on { background-color: var(--pink-t); }
 .kcell.seen::after { content: ""; position: absolute; top: 5px; right: 5px; width: 8px; height: 8px; border-radius: 50%; background: var(--pink); }
+/* 고등 한자 단어 목록 */
+.hknote { margin: 0; padding: 16px 20px 0; color: var(--ink-2); font-size: 13px; }
+.hklist { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; padding: 12px 20px 20px; }
+.hkrow { position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 12px 14px; border: 2px solid var(--line); border-radius: 12px; background: var(--card, transparent); color: var(--ink); font: inherit; text-align: left; cursor: pointer; transition: background-color 150ms var(--ease), transform 200ms var(--spring); }
+.hkrow.on { background: var(--pink-t); border-color: var(--pink); }
+.hkrow.seen::after { content: ""; position: absolute; top: 8px; right: 8px; width: 8px; height: 8px; border-radius: 50%; background: var(--pink); }
+@media (hover: hover) { .hkrow:hover { background: var(--pink-t); } }
+.hkw { font-family: var(--jp); font-size: 22px; line-height: 1.5; }
+.hkm { color: var(--ink-2); font-size: 13px; line-height: 1.4; }
+.hkhead { display: flex; align-items: baseline; flex-wrap: wrap; gap: 12px; padding: 20px 20px 4px; }
+.hkbig { font-family: var(--jp); font-size: 36px; line-height: 1.6; }
+.hkhead .hkm { font-size: 16px; color: var(--ink); }
 .kinfo { display: grid; grid-template-columns: 96px 1fr; gap: 20px; align-items: start; padding: 20px; border-top: 2px solid var(--line); }
 #kdetail { scroll-margin-top: 80px; animation: popIn 360ms var(--spring) both; }
 #kdetail .kinfo { border-top: 0; }
