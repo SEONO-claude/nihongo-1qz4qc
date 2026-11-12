@@ -193,6 +193,7 @@ function currentStageIndex() {
 function schoolOf(id) { return SCHOOLS.find(s => s.id === id) }
 
 function newQuiz() {
+  if (state.quizGrade >= 10 && !highUnlocked()) state.quizGrade = 0   // 잠긴 고등 한자는 전체 한자로
   const wrong = { kanji: progress.wrongKanji, verb: progress.wrong, grammar: progress.wrongGrammar }
   const list = state.quizMode === 'stage' ? buildStageQuiz(STAGES.find(s => s.id === state.stage), wrong)
     : state.quizMode === 'kanji' ? buildKanjiQuiz(state.quizGrade, progress.wrongKanji)
@@ -204,6 +205,7 @@ function newQuiz() {
 // lucide 아이콘 (16px, 선 1.5)
 const ICONS = {
   left: 'm15 18-6-6 6-6', right: 'm9 18 6-6-6-6',
+  lock: 'M5 11h14v10H5z M8 11V7a4 4 0 0 1 8 0v4',
   sound: 'M11 5 6 9H2v6h4l5 4V5Z M15.5 8.5a5 5 0 0 1 0 7 M19 5a10 10 0 0 1 0 14',
   mute: 'M11 5 6 9H2v6h4l5 4V5Z M22 9l-6 6 M16 9l6 6',
   music: 'M9 18V5l12-2v13 M6 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z M18 19a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z',
@@ -408,6 +410,9 @@ function kanjiList(grade) {
   return Object.keys(KANJI).filter(c => KANJI[c].grade === grade)
 }
 
+// 고등 한자 퀴즈는 퀘스트에서 중학교를 졸업해야 열린다
+function highUnlocked() { return progress.graduated.includes('mid') }
+
 function kanjiGrades() {
   const g = [...new Set(Object.values(KANJI).map(k => k.grade))].sort((a, b) => a - b)
   return [...g, ...[10, 11, 12].filter(x => highList(x).length)]
@@ -433,7 +438,8 @@ function highView() {
     <div class="banner-text"><h1>고등 한자</h1><p><span class="num">${progress.seenHigh.length} / ${[10, 11, 12].reduce((n, g) => n + highList(g).length, 0)}</span>개를 봤어요</p></div>
   </section>
   <div class="tabs">${tabs}</div>
-  <div class="subbar"><p class="sub">${gradeLong(state.grade)} ${list.length}개 · 본 단어 <span class="num">${seen} / ${list.length}</span></p><button class="btn" data-act="kanjiQuiz">${gradeName(state.grade)} 한자 퀴즈</button></div>
+  <div class="subbar"><p class="sub">${gradeLong(state.grade)} ${list.length}개 · 본 단어 <span class="num">${seen} / ${list.length}</span></p>${highUnlocked() ? `<button class="btn" data-act="kanjiQuiz">${gradeName(state.grade)} 한자 퀴즈</button>` : `<button class="btn" disabled>${icon('lock')}퀴즈 잠김</button>`}</div>
+  ${highUnlocked() ? '' : '<p class="locknote">퀘스트에서 중학교 졸업 시험을 통과하면 고등 한자 퀴즈가 열려요</p>'}
   ${detail}
   <div class="panel"><p class="hknote">${NOTE[state.grade]}</p><div class="hklist">${rows}</div>
     <div class="hint">단어를 누르면 읽는 법과 쓰인 한자가 나와요 · 본 단어에는 빨간 점</div></div>`
@@ -786,7 +792,7 @@ function quizHeader() {
   const grades = state.quizMode === 'verb'
     ? `<select class="gradesel" data-act="verbLevelSel" aria-label="동사 수준 고르기">${['all', 'elem', 'mid', 'high'].map(l => `<option value="${l}" ${state.verbQuizLevel === l ? 'selected' : ''}>${l === 'all' ? '전체 동사' : `${VERB_LEVELS[l]} 동사`}</option>`).join('')}</select>`
     : state.quizMode === 'kanji'
-    ? `<select class="gradesel" data-act="quizGradeSel" aria-label="학년 고르기">${[0, ...kanjiGrades()].map(g => `<option value="${g}" ${state.quizGrade === g ? 'selected' : ''}>${g ? (g <= 6 ? `초등 ${g}학년` : g <= 9 ? `중학 ${g - 6}묶음` : gradeLong(g)) : '전체 한자'}</option>`).join('')}</select>`
+    ? `<select class="gradesel" data-act="quizGradeSel" aria-label="학년 고르기">${[0, ...kanjiGrades()].map(g => { const lock = g >= 10 && !highUnlocked(); return `<option value="${g}" ${state.quizGrade === g ? 'selected' : ''}${lock ? ' disabled' : ''}>${g ? (g <= 6 ? `초등 ${g}학년` : g <= 9 ? `중학 ${g - 6}묶음` : gradeLong(g) + (lock ? ' (잠김)' : '')) : '전체 한자'}</option>` }).join('')}</select>`
     : state.quizMode === 'grammar'
     ? `<select class="gradesel" data-act="quizLevelSel" aria-label="급수 고르기">${[...LEVELS, 'all', 'saved'].map(l => `<option value="${l}" ${state.quizLevel === l ? 'selected' : ''}>${l === 'all' ? '전체 급수' : l === 'saved' ? `★ 저장한 문법 (${progress.savedGrammar.length})` : l}</option>`).join('')}</select>`
     : ''
@@ -984,7 +990,7 @@ const ACTIONS = {
   quizMode(btn) { state.quizMode = btn.dataset.mode; newQuiz() },
   quizGrade(btn) { state.quizGrade = Number(btn.dataset.grade); newQuiz() },
   restartQuiz() { newQuiz() },
-  kanjiQuiz() { state.quizMode = 'kanji'; state.quizGrade = state.grade; go('quiz'); return true },
+  kanjiQuiz() { if (state.grade >= 10 && !highUnlocked()) return; state.quizMode = 'kanji'; state.quizGrade = state.grade; go('quiz'); return true },
   pickCard(el) { state.cardIdx[state.cardType] = Number(el.value); state.kanji = null; markSeen() },
   conjGroup(btn) { state.conjGroup = Number(btn.dataset.group) },
   conjLevel(btn) { state.conjLevel = btn.dataset.level },
