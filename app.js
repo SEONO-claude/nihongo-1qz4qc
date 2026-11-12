@@ -180,7 +180,7 @@ const pickOne = list => list[Math.floor(Math.random() * list.length)]
 
 // ───── 공통 ─────
 const app = document.getElementById('app')
-const state = { view: 'home', cardType: 'verb', cardIdx: { verb: 0, adj: 0, noun: 0 }, verb: 0, kanji: null, quiz: null, grade: 1, conjMode: 'one', conjGroup: 0, quizMode: 'verb', quizGrade: 0, grammarLevel: 'N5', grammarOpen: null, quizLevel: 'N5', quizTab: 'quest', stage: null, verbQuizLevel: 'all' }
+const state = { view: 'home', cardType: 'verb', cardIdx: { verb: 0, adj: 0, noun: 0, high: 0 }, verb: 0, kanji: null, quiz: null, grade: 1, conjMode: 'one', conjGroup: 0, quizMode: 'verb', quizGrade: 0, grammarLevel: 'N5', grammarOpen: null, quizLevel: 'N5', quizTab: 'quest', stage: null, verbQuizLevel: 'all' }
 
 // ───── 퀘스트 진행 ─────
 function stageStars(id) { return progress.stages[id] || 0 }
@@ -485,10 +485,20 @@ function kanjiInfo(text) {
 const NOUN_CATS = ['학교', '집', '음식', '몸', '자연·날씨', '시간', '사람·가족', '장소·마을', '동물·식물', '물건·놀이', '교통', '일·기타']
 // 명사는 주제 순서로 모아 둔다
 const NOUN_LIST = NOUNS.slice().sort((a, b) => NOUN_CATS.indexOf(a.cat) - NOUN_CATS.indexOf(b.cat))
+// 고등 한자 단어 카드: 앞뒤의 같은 가나는 후리가나에서 빼고 칸만 그린다 (お巡りさん → お / 巡:まわ / りさん)
+function splitRuby(w, r) {
+  let a = 0, b = 0
+  while (a < w.length - 1 && w[a] === r[a] && !/\p{Script=Han}/u.test(w[a])) a++
+  while (b < w.length - a - 1 && w[w.length - 1 - b] === r[r.length - 1 - b] && !/\p{Script=Han}/u.test(w[w.length - 1 - b])) b++
+  return [[w.slice(0, a), ''], [w.slice(a, w.length - b), r.slice(a, r.length - b)], [w.slice(w.length - b), '']].filter(p => p[0])
+}
+const HIGH_CARDS = typeof HIGH_KANJI === 'undefined' ? [] : Object.keys(HK_SETS).flatMap(s => (HIGH_KANJI[s] || []).map(([w, r, m], i) => (
+  { id: `${s}:${i}`, set: s, kanji: w, reading: r, meaning: m, ruby: splitRuby(w, r), cat: HK_SETS[s] })))
 const CARD_TYPES = {
   verb: { label: '동사', list: WORDS, prefix: '' },
   adj: { label: '형용사', list: ADJECTIVES, prefix: 'a:' },
   noun: { label: '명사', list: NOUN_LIST, prefix: 'n:' },
+  high: { label: '고등 한자', list: HIGH_CARDS, prefix: 'h:' },
 }
 function cardList() { return CARD_TYPES[state.cardType].list }
 function cardIndex() { return state.cardIdx[state.cardType] }
@@ -508,6 +518,10 @@ function verbOptions(selected) {
 function cardOptions() {
   const list = cardList(), sel = cardIndex()
   if (state.cardType === 'verb') return verbOptions(sel)
+  if (state.cardType === 'high') return Object.entries(HK_SETS).map(([s, name]) => {
+    const items = list.map((x, i) => [x, i]).filter(([x]) => x.set === s)
+    return `<optgroup label="${name} ${items.length}개">${items.map(([x, i]) => `<option value="${i}" ${i === sel ? 'selected' : ''}>${optionText(x)}</option>`).join('')}</optgroup>`
+  }).join('')
   if (state.cardType !== 'noun') return list.map((x, i) => `<option value="${i}" ${i === sel ? 'selected' : ''}>${optionText(x)}</option>`).join('')
   return NOUN_CATS.map(cat => {
     const items = list.map((x, i) => [x, i]).filter(([x]) => x.cat === cat)
@@ -540,7 +554,7 @@ function adjTable(a) {
 function cardsView() {
   const type = state.cardType, list = cardList(), i = cardIndex(), w = list[i]
   const tabs = Object.entries(CARD_TYPES).map(([t, c]) => `<button class="${t === type ? 'on' : ''}" data-act="cardType" data-type="${t}">${c.label}<span class="num">${c.list.length}</span></button>`).join('')
-  const sub = type === 'verb' ? `${VERB_LEVELS[verbLevel(w)]} 동사 · ${GROUP_LABEL[w.group]}` : type === 'adj' ? ADJ_LABEL[w.type] : w.cat
+  const sub = type === 'verb' ? `${VERB_LEVELS[verbLevel(w)]} 동사 · ${GROUP_LABEL[w.group]}` : type === 'adj' ? ADJ_LABEL[w.type] : type === 'high' ? `고등 ${w.cat}` : w.cat
   const hasKanji = w.ruby.some(p => p[1] && [...p[0]].some(ch => KANJI[ch]))
   const hint = [w.note ? w.note.replace(/\.$/, '') : '', hasKanji ? '한자를 누르면 음독과 훈독이 나와요' : ''].filter(Boolean).join(' · ')
   return `
@@ -567,6 +581,7 @@ function markSeen() {
   const w = cardList()[cardIndex()]
   const key = seenKey(state.cardType, w.id)
   progress.seen[key] = (progress.seen[key] || 0) + 1
+  if (state.cardType === 'high' && !progress.seenHigh.includes(w.kanji)) progress.seenHigh.push(w.kanji)   // 한자 화면의 "본 단어"와 함께 센다
   todayStats().cards++
   addXP(1)
 }
