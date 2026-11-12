@@ -172,7 +172,8 @@ function rubyHTML(pairs) {
 function masuRow(pairs, { clickable = false, size = '' } = {}) {
   const groups = pairs.map(([text, reading]) => {
     const cells = [...text].map(ch => `<span class="masu${reading ? '' : ' kana'}">${ch}</span>`).join('')
-    const tap = clickable && reading
+    // 설명이 있는 한자(초등 1026자)가 들어 있을 때만 누를 수 있다
+    const tap = clickable && reading && [...text].some(ch => KANJI[ch])
     const on = tap && state.kanji === text ? ' on' : ''
     const attrs = tap ? ` data-kanji="${text}" role="button" tabindex="0" aria-label="${text} 자세히"` : ''
     return `<span class="masu-group${tap ? ' kj' : ''}${on}"${attrs}><span class="furi">${reading || ''}</span><span class="cells">${cells}</span></span>`
@@ -440,7 +441,7 @@ function cardsView() {
   const type = state.cardType, list = cardList(), i = cardIndex(), w = list[i]
   const tabs = Object.entries(CARD_TYPES).map(([t, c]) => `<button class="${t === type ? 'on' : ''}" data-act="cardType" data-type="${t}">${c.label}<span class="num">${c.list.length}</span></button>`).join('')
   const sub = type === 'verb' ? GROUP_LABEL[w.group] : type === 'adj' ? ADJ_LABEL[w.type] : w.cat
-  const hasKanji = w.ruby.some(p => p[1])
+  const hasKanji = w.ruby.some(p => p[1] && [...p[0]].some(ch => KANJI[ch]))
   const hint = [w.note ? w.note.replace(/\.$/, '') : '', hasKanji ? '한자를 누르면 음독과 훈독이 나와요' : ''].filter(Boolean).join(' · ')
   return `
   <div class="tabs cardtabs">${tabs}</div>
