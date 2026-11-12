@@ -518,10 +518,11 @@ function conjOneView() {
 function quizHeader() {
   const modes = [['verb', '동사 변화'], ['kanji', '한자']]
     .map(([m, label]) => `<button class="${state.quizMode === m ? 'on' : ''}" data-act="quizMode" data-mode="${m}">${label}</button>`).join('')
+  // 한 줄로: [동사 변화 | 한자] + 한자일 때 학년 고르기
   const grades = state.quizMode === 'kanji'
-    ? `<div class="filters">${[0, 1, 2, 3, 4, 5, 6].map(g => `<button class="${state.quizGrade === g ? 'on' : ''}" data-act="quizGrade" data-grade="${g}">${g ? `${g}학년` : '전체'}</button>`).join('')}</div>`
+    ? `<select class="gradesel" data-act="quizGradeSel" aria-label="학년 고르기">${[0, 1, 2, 3, 4, 5, 6].map(g => `<option value="${g}" ${state.quizGrade === g ? 'selected' : ''}>${g ? `${g}학년` : '전체 학년'}</option>`).join('')}</select>`
     : ''
-  return `<div class="tabs">${modes}</div>${grades}`
+  return `<div class="quizbar"><div class="tabs">${modes}</div>${grades}</div>`
 }
 
 // 위쪽 진행 막대 + 연속 정답
@@ -624,9 +625,6 @@ function pick(i) {
   }
   const next = document.getElementById('nextbtn')
   if (next) next.focus({ preventScroll: true })
-  // 고른 보기가 알림창에 가리지 않게 살짝 내려 준다
-  const chosen = document.querySelector(`[data-pick="${i}"]`)
-  if (chosen && chosen.getBoundingClientRect().bottom > innerHeight - 200) chosen.scrollIntoView({ behavior: 'smooth', block: 'center' })
 }
 
 // ───── 이벤트 ─────
@@ -643,6 +641,7 @@ const ACTIONS = {
   nextQ() {
     const qz = state.quiz
     qz.i++; qz.picked = null; qz.comboPop = false
+    window.scrollTo(0, 0)
     if (qz.i >= qz.list.length && !qz.counted) {
       qz.counted = true
       qz.xp += 20
@@ -719,6 +718,7 @@ document.addEventListener('keydown', e => {
 document.addEventListener('change', e => {
   if (e.target.matches('select[data-act="pickVerb"]')) { state.verb = Number(e.target.value); render() }
   if (e.target.matches('select[data-act="pickCard"]')) { ACTIONS.pickCard(e.target); render() }
+  if (e.target.matches('select[data-act="quizGradeSel"]')) { state.quizGrade = Number(e.target.value); newQuiz(); render() }
 })
 
 // ───── 오프라인 (홈 화면에 추가해서 쓸 때) ─────
