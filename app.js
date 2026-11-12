@@ -1,6 +1,6 @@
 // ───── 진도 저장 (localStorage) ─────
 const STORE_KEY = 'jp-study-progress'
-const EMPTY = { seen: {}, seenKanji: [], learnedForms: [], wrong: [], learnedKanji: [], wrongKanji: [], lastStudy: '', studyDays: [], today: { date: '', cards: 0, quizzes: 0 } }
+const EMPTY = { seen: {}, seenKanji: [], learnedForms: [], wrong: [], learnedKanji: [], wrongKanji: [], lastStudy: '', studyDays: [], today: { date: '', cards: 0, quizzes: 0, xp: 0 }, xp: 0, sound: true }
 
 function loadProgress() {
   try { return { ...EMPTY, ...JSON.parse(localStorage.getItem(STORE_KEY) || '{}') } }
@@ -12,17 +12,84 @@ function todayStr(offset = 0) {
 }
 function saveProgress() {
   progress.lastStudy = todayStr()
-  if (!progress.studyDays.includes(progress.lastStudy)) progress.studyDays = [...progress.studyDays, progress.lastStudy].slice(-90)
+  if (!progress.studyDays.includes(progress.lastStudy)) {
+    progress.studyDays = [...progress.studyDays, progress.lastStudy].slice(-90)
+    state.stampedNow = true   // 오늘 도장이 방금 찍힘 → 홈에서 "쾅" 하고 보여 준다
+  }
   try { localStorage.setItem(STORE_KEY, JSON.stringify(progress)) } catch { /* 저장이 막힌 브라우저 */ }
 }
 const progress = loadProgress()
 
 // 오늘 한 공부 (날짜가 바뀌면 0부터)
 function todayStats() {
-  if (progress.today.date !== todayStr()) progress.today = { date: todayStr(), cards: 0, quizzes: 0 }
+  if (progress.today.date !== todayStr()) progress.today = { date: todayStr(), cards: 0, quizzes: 0, xp: 0 }
+  if (progress.today.xp === undefined) progress.today.xp = 0
   return progress.today
 }
 function bumpToday(key) { todayStats()[key]++; saveProgress() }
+
+// 경험치(XP): 카드 1, 정답 10, 퀴즈 끝내기 20
+function addXP(n, x, y) {
+  todayStats().xp += n
+  progress.xp = (progress.xp || 0) + n
+  saveProgress()
+  updateTop()
+  if (x !== undefined) {
+    const el = document.createElement('div')
+    el.className = 'xpfloat'; el.textContent = `+${n} XP`
+    el.style.left = x + 'px'; el.style.top = y + 'px'
+    document.body.appendChild(el)
+    setTimeout(() => el.remove(), 1100)
+  }
+}
+
+// ───── 효과음 (기기 안에서 바로 만듦, 인터넷 필요 없음) ─────
+let audioCtx = null
+function tone(freqs, { dur = 0.13, type = 'triangle', gap = 0.09, vol = 0.16 } = {}) {
+  if (!progress.sound) return
+  try {
+    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)()
+    const t0 = audioCtx.currentTime + 0.01
+    freqs.forEach((f, i) => {
+      const o = audioCtx.createOscillator(), g = audioCtx.createGain()
+      const s = t0 + i * gap
+      o.type = type; o.frequency.setValueAtTime(f, s)
+      g.gain.setValueAtTime(0.0001, s)
+      g.gain.exponentialRampToValueAtTime(vol, s + 0.012)
+      g.gain.exponentialRampToValueAtTime(0.0001, s + dur)
+      o.connect(g); g.connect(audioCtx.destination)
+      o.start(s); o.stop(s + dur + 0.03)
+    })
+  } catch { /* 소리를 낼 수 없는 기기 */ }
+}
+const SFX = {
+  good: () => tone([659, 988], { gap: 0.08 }),
+  combo: () => tone([659, 880, 1175], { gap: 0.07 }),
+  bad: () => tone([247, 196], { type: 'sine', gap: 0.12, dur: 0.2, vol: 0.14 }),
+  done: () => tone([523, 659, 784, 1047, 1319], { gap: 0.09, dur: 0.2 }),
+  tap: () => tone([523], { dur: 0.05, vol: 0.05, type: 'sine' }),
+  stamp: () => tone([110, 82], { type: 'sine', gap: 0.05, dur: 0.18, vol: 0.25 }),
+}
+
+// 벚꽃잎·별 터뜨리기
+const PETAL_COLORS = ['#ff8fb1', '#ffb3c8', '#ffc23c', '#35a7ff', '#4cc27a', '#ff6b95']
+function confetti(x, y, n = 28) {
+  if (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) return
+  const box = document.createElement('div')
+  box.className = 'confetti'
+  for (let i = 0; i < n; i++) {
+    const a = Math.random() * Math.PI * 2, d = 80 + Math.random() * 180
+    const p = document.createElement('i')
+    p.style.cssText = `--x:${x}px;--y:${y}px;--s:${6 + Math.random() * 8}px;--c:${PETAL_COLORS[i % PETAL_COLORS.length]};--dx:${Math.cos(a) * d}px;--dy:${Math.sin(a) * d - 60}px;--rot:${Math.random() * 540 - 270}deg;animation-delay:${Math.random() * 80}ms`
+    box.appendChild(p)
+  }
+  document.body.appendChild(box)
+  setTimeout(() => box.remove(), 1400)
+}
+function centerOf(el) {
+  const r = el.getBoundingClientRect()
+  return [r.left + r.width / 2, r.top + r.height / 2]
+}
 const GOAL = { cards: 10, quizzes: 1 }
 
 // 연속으로 공부한 날 (오늘 아직 안 했으면 어제까지 센다)
@@ -42,7 +109,19 @@ function dailyKanji() {
 }
 
 // 그림: 앱에서는 images/ 파일, 한 파일로 묶은 페이지에서는 미리 넣어 둔 데이터
-const IMAGES = window.APP_IMAGES || { home: 'images/home.webp', kanji: 'images/kanji.webp', quiz: 'images/quiz.webp' }
+const IMAGES = window.APP_IMAGES || {
+  home: 'images/home.webp', kanji: 'images/kanji.webp', quiz: 'images/quiz.webp',
+  mascot: 'images/mascot.webp', think: 'images/mascot-think.webp', cheer: 'images/mascot-cheer.webp',
+  sad: 'images/mascot-sad.webp', party: 'images/mascot-party.webp',
+}
+// 미케 그림 (포즈가 없으면 기본 모습)
+function mascot(mood = 'mascot', cls = 'mascot') {
+  const src = IMAGES[mood] || IMAGES.mascot
+  return src ? `<img class="${cls}" src="${src}" alt="미케" width="320" height="320">` : ''
+}
+const CHEERS = ['정답이에요', '잘했어요', '완벽해요', '좋아요, 그대로 가요', '역시 미케 친구']
+const ENCOURAGE = ['괜찮아요, 다음엔 맞힐 거예요', '아깝다, 한 번 더 봐요', '틀려도 괜찮아요', '이제 기억했죠']
+const pickOne = list => list[Math.floor(Math.random() * list.length)]
 
 // ───── 공통 ─────
 const app = document.getElementById('app')
@@ -52,11 +131,15 @@ function newQuiz() {
   const list = state.quizMode === 'kanji'
     ? buildKanjiQuiz(state.quizGrade, progress.wrongKanji)
     : buildVerbQuiz(progress.wrong)
-  state.quiz = { list, i: 0, picked: null, right: 0, missed: [] }
+  state.quiz = { list, i: 0, picked: null, right: 0, missed: [], combo: 0, best: 0, xp: 0 }
 }
 
 // lucide 아이콘 (16px, 선 1.5)
-const ICONS = { left: 'm15 18-6-6 6-6', right: 'm9 18 6-6-6-6' }
+const ICONS = {
+  left: 'm15 18-6-6 6-6', right: 'm9 18 6-6-6-6',
+  sound: 'M11 5 6 9H2v6h4l5 4V5Z M15.5 8.5a5 5 0 0 1 0 7 M19 5a10 10 0 0 1 0 14',
+  mute: 'M11 5 6 9H2v6h4l5 4V5Z M22 9l-6 6 M16 9l6 6',
+}
 function icon(name) {
   return `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="${ICONS[name]}"/></svg>`
 }
@@ -120,7 +203,28 @@ function render() {
   document.querySelectorAll('.top nav button').forEach(b => b.classList.toggle('on', b.dataset.go === state.view))
   app.classList.toggle('wide', state.view === 'conj' && state.conjMode === 'all')
   app.classList.toggle('homewide', state.view === 'home')
+  app.dataset.view = state.view
   app.innerHTML = VIEWS[state.view]()
+  // 한 번만 보여 줄 움직임은 그린 뒤 끈다
+  if (state.view === 'home' && state.stampedNow) { state.stampedNow = false; setTimeout(SFX.stamp, 400) }
+  state.slide = null
+  // 화면을 옮겼을 때만 살짝 떠오르며 나타난다
+  if (state.lastView !== state.view) {
+    app.classList.remove('view-in'); void app.offsetWidth; app.classList.add('view-in')
+    state.lastView = state.view
+  }
+  updateTop()
+}
+
+// 위쪽 줄: 오늘 XP, 효과음 켜기/끄기
+function updateTop() {
+  const xp = document.getElementById('xp')
+  if (xp) xp.innerHTML = `오늘 <b class="num">${todayStats().xp}</b> XP`
+  const s = document.getElementById('soundbtn')
+  if (s) {
+    s.innerHTML = `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="${ICONS[progress.sound ? 'sound' : 'mute']}"/></svg>`
+    s.setAttribute('aria-label', progress.sound ? '효과음 끄기' : '효과음 켜기')
+  }
 }
 
 function bar(label, done, total) {
@@ -163,7 +267,7 @@ function homeView() {
     const stamped = days.has(day), isToday = n === 13
     return `<span class="stampcell${isToday ? ' today' : ''}" title="${day}">
       <span class="stampday num">${d.getDate()}</span>
-      ${stamped ? `<span class="stamp" lang="ja" style="--r:${((d.getDate() * 37) % 21) - 10}deg">済</span>` : ''}
+      ${stamped ? `<span class="stamp${isToday && state.stampedNow ? ' new' : ''}" lang="ja" style="--r:${((d.getDate() * 37) % 21) - 10}deg">済</span>` : ''}
     </span>`
   }).join('')
   const stampCard = `
@@ -174,11 +278,16 @@ function homeView() {
   </div>`
 
   // 오늘의 목표
-  const goal = (label, n, max) => `<div class="goal${n >= max ? ' done' : ''}"><span>${label}</span><span class="num">${Math.min(n, max)} / ${max}</span>${n >= max ? maruSVG() : ''}</div>`
+  const check = '<svg class="check" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" pathLength="1"/></svg>'
+  const goal = (label, n, max, c) => `<div class="goal${n >= max ? ' done' : ''}" style="--c:${c}">
+    <span>${label}${n >= max ? check : ''}</span><span class="num">${Math.min(n, max)} / ${max}</span>
+    <div class="bar"><i style="width:${Math.min(n, max) / max * 100}%"></i></div></div>`
+  const hello = t.xp > 0 ? `오늘 ${t.xp} XP 모았어요` : s >= 2 ? `${s}일 연속이에요` : '같이 공부해요'
 
   return `
   <section class="hero">
-    <img class="hero-img" src="${IMAGES.home}" alt="해 질 녘 빈 교실, 창가 책상 위에 펼친 한자 연습장과 빨간 연필" width="1600" height="900" fetchpriority="high">
+    <img class="hero-img" src="${IMAGES.home}" alt="화창한 아침 교실, 창밖의 벚꽃과 책상 위의 한자 연습장" width="1600" height="905" fetchpriority="high">
+    <div class="hero-mascot">${mascot('mascot', '')}<span class="says">${hello}</span></div>
     <div class="hero-text">
       <span class="hero-date">${date} ${weekday}</span>
       <h1>오늘의 공부</h1>
@@ -192,8 +301,8 @@ function homeView() {
   <div class="homegrid">${todayKanji}${stampCard}</div>
   <div class="panel goals">
     <div class="eyebrow">오늘의 목표</div>
-    ${goal('단어 카드 보기', t.cards, GOAL.cards)}
-    ${goal('퀴즈 한 번 끝내기', t.quizzes, GOAL.quizzes)}
+    ${goal('단어 카드 보기', t.cards, GOAL.cards, 'var(--sky)')}
+    ${goal('퀴즈 한 번 끝내기', t.quizzes, GOAL.quizzes, 'var(--sun)')}
   </div>
   <div class="panel">
     <div class="hd">지금까지</div>
@@ -320,7 +429,7 @@ function cardsView() {
   </div>
   <div class="panel">
     <div class="hd">${CARD_TYPES[type].label} 카드<span class="num">${i + 1} / ${list.length}</span></div>
-    <div class="stage">${masuRow(w.ruby, { clickable: true, size: cardSize(w.kanji) })}</div>
+    <div class="stage${state.slide ? ' slide-' + state.slide : ''}">${masuRow(w.ruby, { clickable: true, size: cardSize(w.kanji) })}</div>
     <div class="mean">${w.meaning}<span>${sub}</span></div>
     ${hint ? `<div class="hint">${hint}</div>` : ''}
     ${type === 'adj' ? adjTable(w) : ''}
@@ -337,7 +446,8 @@ function markSeen() {
   const w = cardList()[cardIndex()]
   const key = seenKey(state.cardType, w.id)
   progress.seen[key] = (progress.seen[key] || 0) + 1
-  bumpToday('cards')
+  todayStats().cards++
+  addXP(1)
 }
 
 // ───── 동사 변화표 ─────
@@ -411,16 +521,15 @@ function quizHeader() {
   const grades = state.quizMode === 'kanji'
     ? `<div class="filters">${[0, 1, 2, 3, 4, 5, 6].map(g => `<button class="${state.quizGrade === g ? 'on' : ''}" data-act="quizGrade" data-grade="${g}">${g ? `${g}학년` : '전체'}</button>`).join('')}</div>`
     : ''
-  const qz = state.quiz
-  const title = state.quizMode === 'kanji' ? `한자 퀴즈 · ${state.quizGrade ? `${state.quizGrade}학년` : '전체'}` : '동사 변화 퀴즈'
-  const done = qz.i >= qz.list.length
-  const line = done ? `${qz.list.length}문제 중 ${qz.right}개 맞혔어요` : `${qz.i + 1} / ${qz.list.length}번 · 맞힌 문제 ${qz.right}`
-  return `
-  <section class="board">
-    <img src="${IMAGES.quiz}" alt="햇빛이 드는 빈 칠판과 분필" width="1680" height="720">
-    <div class="board-text"><h1>${title}</h1><p class="num">${line}</p></div>
-  </section>
-  <div class="tabs">${modes}</div>${grades}`
+  return `<div class="tabs">${modes}</div>${grades}`
+}
+
+// 위쪽 진행 막대 + 연속 정답
+function quizTop(qz) {
+  const answered = qz.picked !== null && qz.i < qz.list.length
+  const pct = Math.min(100, (qz.i + (answered ? 1 : 0)) / qz.list.length * 100)
+  return `<div class="qtop"><div class="qbar" role="progressbar" aria-valuenow="${Math.round(pct)}" aria-valuemin="0" aria-valuemax="100"><i style="width:${pct}%"></i></div>
+    <span class="combo${qz.comboPop ? ' pop' : ''}">${qz.combo >= 2 ? `${qz.combo}연속 정답` : `${Math.min(qz.i + 1, qz.list.length)} / ${qz.list.length}`}</span></div>`
 }
 
 function quizView() {
@@ -428,42 +537,52 @@ function quizView() {
   if (qz.i >= qz.list.length) return quizHeader() + quizDoneView()
   const q = qz.list[qz.i]
   const answered = qz.picked !== null
+  const ok = answered && q.choices[qz.picked].ok
   const buttons = q.choices.map((c, i) => {
     let cls = 'choice'
     if (answered && c.ok) cls += ' ok'
     else if (answered && i === qz.picked) cls += ' miss'
     return `<button class="${cls}" data-pick="${i}" ${c.ko ? '' : 'lang="ja"'} ${answered ? 'disabled' : ''}>${c.html}${answered && c.ok ? maruSVG() : ''}</button>`
   }).join('')
-  let msg = ''
-  if (answered) {
-    msg = q.choices[qz.picked].ok
-      ? `<div class="msg"><b>맞았어요</b>${q.right ? `<span>${q.right}</span>` : ''}</div>`
-      : `<div class="msg"><b>틀렸어요 · 다시 볼 문제에 넣었어요</b><span>${q.wrong}</span></div>`
-  }
+  const mood = !answered ? 'think' : ok ? 'cheer' : 'sad'
+  const say = !answered ? q.prompt : ok ? qz.say : qz.say
   const last = qz.i === qz.list.length - 1
-  return quizHeader() + `
-  <div class="panel">
-    <div class="q">${q.head}<p>${q.prompt}</p></div>
+  const sheet = answered ? `
+  <div class="feedback ${ok ? 'good' : 'bad'}" role="status">
+    <div class="in">
+      ${mascot(ok ? 'cheer' : 'sad', 'fmascot')}
+      <div class="ftext"><b>${ok ? '정답이에요' : '아쉬워요 · 다시 볼 문제에 넣었어요'}</b><span>${ok ? (q.right || '') : q.wrong}</span></div>
+      <button class="btn pri" data-act="nextQ" id="nextbtn">${last ? '결과 보기' : '계속'}</button>
+    </div>
+  </div>` : ''
+  return quizHeader() + quizTop(qz) + `
+  <div class="panel qcard">
+    <div class="qhead">${mascot(mood)}<div class="bubble" ${answered ? '' : 'aria-live="polite"'}>${say}</div></div>
+    <div class="q">${q.head}</div>
     <div class="choices">${buttons}</div>
-    ${msg}
-    ${answered ? `<div class="actions"><button class="btn pri" data-act="nextQ">${last ? '결과 보기' : `다음${icon('right')}`}</button></div>` : ''}
-  </div>`
+  </div>${sheet}`
 }
 
 function quizDoneView() {
   const qz = state.quiz
   const total = qz.list.length
-  const top = qz.right === total
-    ? `<div class="done">${hanamaruSVG()}<p>모두 맞혔어요</p></div>`
-    : `<div class="done"><div class="score"><span class="got">${qz.right}</span> / ${total}</div></div>`
+  const perfect = qz.right === total
   const list = qz.missed.length
     ? `<div class="row">틀린 문제 ${qz.missed.length}개는 다음 퀴즈에 다시 나와요</div>
        ${qz.missed.map(q => `<div class="row wrongrow">${q.review}</div>`).join('')}`
     : ''
   return `
   <div class="panel">
-    <div class="hd">결과<span class="num">${qz.right} / ${total}</span></div>
-    ${top}
+    <div class="done">
+      ${perfect ? hanamaruSVG() : ''}
+      ${mascot(perfect ? 'party' : qz.right >= total * 0.6 ? 'cheer' : 'mascot')}
+      <p>${perfect ? '모두 맞혔어요' : qz.right >= total * 0.6 ? '잘했어요' : '한 번 더 해 봐요'}</p>
+      <div class="stats">
+        <div class="stat"><b class="num">${qz.right} / ${total}</b><small>맞힌 문제</small></div>
+        <div class="stat"><b class="num">+${qz.xp}</b><small>얻은 XP</small></div>
+        <div class="stat"><b class="num">${qz.best}</b><small>최고 연속</small></div>
+      </div>
+    </div>
     ${list}
     <div class="actions"><button class="btn pri" data-act="restartQuiz">다시 풀기</button><button class="btn" data-go="home">처음으로</button></div>
   </div>`
@@ -472,36 +591,69 @@ function quizDoneView() {
 function pick(i) {
   const qz = state.quiz
   if (qz.picked !== null) return
+  const btn = document.querySelector(`[data-pick="${i}"]`)
+  const [x, y] = btn ? centerOf(btn) : [innerWidth / 2, innerHeight / 2]
   qz.picked = i
   const q = qz.list[qz.i]
   const kanji = state.quizMode === 'kanji'
   const learned = kanji ? 'learnedKanji' : 'learnedForms'
   const wrong = kanji ? 'wrongKanji' : 'wrong'
-  if (q.choices[i].ok) {
+  const ok = q.choices[i].ok
+  if (ok) {
     qz.right++
+    qz.combo++; qz.best = Math.max(qz.best, qz.combo); qz.comboPop = qz.combo >= 2
+    qz.say = qz.combo >= 3 ? `${qz.combo}연속이에요, 대단해요` : pickOne(CHEERS)
     if (!progress[learned].includes(q.key)) progress[learned].push(q.key)
     progress[wrong] = progress[wrong].filter(k => k !== q.key)
   } else {
+    qz.combo = 0; qz.comboPop = false
+    qz.say = pickOne(ENCOURAGE)
     qz.missed.push(q)
     if (!progress[wrong].includes(q.key)) progress[wrong].push(q.key)
   }
   saveProgress()
   render()
+  if (ok) {
+    const gain = qz.combo >= 3 ? 15 : 10
+    qz.xp += gain
+    ;(qz.combo >= 3 ? SFX.combo : SFX.good)()
+    confetti(x, y, qz.combo >= 3 ? 40 : 24)
+    addXP(gain, x, y - 20)
+  } else {
+    SFX.bad()
+  }
+  const next = document.getElementById('nextbtn')
+  if (next) next.focus({ preventScroll: true })
+  // 고른 보기가 알림창에 가리지 않게 살짝 내려 준다
+  const chosen = document.querySelector(`[data-pick="${i}"]`)
+  if (chosen && chosen.getBoundingClientRect().bottom > innerHeight - 200) chosen.scrollIntoView({ behavior: 'smooth', block: 'center' })
 }
 
 // ───── 이벤트 ─────
 const VIEWS = { home: homeView, kanji: kanjiView, cards: cardsView, conj: conjView, quiz: quizView }
 
 const ACTIONS = {
-  prevCard() { state.cardIdx[state.cardType]--; state.kanji = null; markSeen() },
-  nextCard() { state.cardIdx[state.cardType]++; state.kanji = null; markSeen() },
+  prevCard() { state.cardIdx[state.cardType]--; state.kanji = null; state.slide = 'prev'; markSeen(); SFX.tap() },
+  nextCard() { state.cardIdx[state.cardType]++; state.kanji = null; state.slide = 'next'; markSeen(); SFX.tap() },
+  sound() { progress.sound = !progress.sound; saveProgress(); updateTop(); SFX.tap(); return true },
   showConj() { state.verb = state.cardIdx.verb; state.conjMode = 'one'; go('conj'); return true },
   cardType(btn) { state.cardType = btn.dataset.type; state.kanji = null; markSeen() },
   prevVerb() { state.verb-- },
   nextVerb() { state.verb++ },
   nextQ() {
-    state.quiz.i++; state.quiz.picked = null
-    if (state.quiz.i >= state.quiz.list.length && !state.quiz.counted) { state.quiz.counted = true; bumpToday('quizzes') }
+    const qz = state.quiz
+    qz.i++; qz.picked = null; qz.comboPop = false
+    if (qz.i >= qz.list.length && !qz.counted) {
+      qz.counted = true
+      qz.xp += 20
+      bumpToday('quizzes')
+      render()
+      addXP(20)
+      SFX.done()
+      confetti(innerWidth / 2, innerHeight * 0.35, qz.right === qz.list.length ? 70 : 36)
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+      return true
+    }
   },
   todayKanji() { const c = dailyKanji(); state.grade = KANJI[c].grade; go('kanji'); openKanjiChar(c); return true },
   grade(btn) { state.grade = Number(btn.dataset.grade); state.kanji = null },
@@ -553,6 +705,11 @@ document.addEventListener('click', e => {
 })
 
 document.addEventListener('keydown', e => {
+  // 퀴즈: 1~4 키로 고르기, Enter로 계속
+  if (state.view === 'quiz' && state.quiz && state.quiz.i < state.quiz.list.length && !e.target.closest?.('select')) {
+    const n = Number(e.key)
+    if (state.quiz.picked === null && n >= 1 && n <= state.quiz.list[state.quiz.i].choices.length) { e.preventDefault(); return pick(n - 1) }
+  }
   const vr = e.target.closest && e.target.closest('tr[data-verb]')
   if (vr && e.key === 'Enter') { e.preventDefault(); openVerb(vr); return }
   const kj = e.target.closest && e.target.closest('.masu-group[data-kanji]')
