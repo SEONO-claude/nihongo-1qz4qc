@@ -1,6 +1,6 @@
 // ───── 진도 저장 (localStorage) ─────
 const STORE_KEY = 'jp-study-progress'
-const EMPTY = { seen: {}, seenKanji: [], learnedForms: [], wrong: [], learnedKanji: [], wrongKanji: [], lastStudy: '', studyDays: [], today: { date: '', cards: 0, quizzes: 0, xp: 0 }, xp: 0, sound: true, music: true, savedGrammar: [], seenHigh: [], seenGrammar: [], learnedGrammar: [], wrongGrammar: [], stages: {}, graduated: [] }
+const EMPTY = { seen: {}, seenKanji: [], learnedForms: [], wrong: [], learnedKanji: [], wrongKanji: [], lastStudy: '', studyDays: [], today: { date: '', cards: 0, quizzes: 0, xp: 0 }, xp: 0, sound: true, music: true, savedGrammar: [], seenHigh: [], seenGrammar: [], learnedGrammar: [], wrongGrammar: [], stages: {}, graduated: [], badges: [], bestCombo: 0 }
 
 function loadProgress() {
   try { return { ...EMPTY, ...JSON.parse(localStorage.getItem(STORE_KEY) || '{}') } }
@@ -159,8 +159,9 @@ function streak() {
 const KANJI_ORDER = [...GRADE1_ORDER, ...Object.keys(KANJI).filter(c => KANJI[c].grade > 1).sort((a, b) => KANJI[a].grade - KANJI[b].grade)]
 function dailyKanji() {
   const d = Math.round((Date.parse(todayStr()) - Date.parse('2026-11-12')) / 86400000)
-  const n = KANJI_ORDER.length
-  return KANJI_ORDER[((d % n) + n) % n]
+  const list = KANJI_ORDER.filter(c => isOpen('kanji', KANJI[c].grade))
+  const n = list.length
+  return list[((d % n) + n) % n]
 }
 
 // 그림: 앱에서는 images/ 파일, 한 파일로 묶은 페이지에서는 미리 넣어 둔 데이터
@@ -193,7 +194,10 @@ function currentStageIndex() {
 function schoolOf(id) { return SCHOOLS.find(s => s.id === id) }
 
 function newQuiz() {
-  if (state.quizGrade >= 10 && !highUnlocked()) state.quizGrade = 0   // 잠긴 고등 한자는 전체 한자로
+  // 잠긴 학년·수준·급수를 골라 두었으면 '전체'로
+  if (state.quizGrade && !isOpen('kanji', state.quizGrade)) state.quizGrade = 0
+  if (state.verbQuizLevel !== 'all' && !isOpen('verb', state.verbQuizLevel)) state.verbQuizLevel = 'all'
+  if (LEVELS.includes(state.quizLevel) && !isOpen('grammar', state.quizLevel)) state.quizLevel = 'all'
   const wrong = { kanji: progress.wrongKanji, verb: progress.wrong, grammar: progress.wrongGrammar }
   const list = state.quizMode === 'stage' ? buildStageQuiz(STAGES.find(s => s.id === state.stage), wrong)
     : state.quizMode === 'kanji' ? buildKanjiQuiz(state.quizGrade, progress.wrongKanji)
@@ -328,6 +332,21 @@ function homeView() {
   const t = todayStats(), s = streak(), studiedToday = progress.studyDays.includes(todayStr())
   const nextSt = STAGES[currentStageIndex()]
   const lead = `다음 퀘스트 · ${schoolOf(nextSt.school).name} ${nextSt.name}` + (s >= 2 ? ` · ${s}일 연속` : '')
+  const allClear = STAGES.every(x => stageCleared(x.id))
+
+  // 다음 목표: 지금 스테이지를 통과하면 무엇이 열리는지
+  const after = STAGES[currentStageIndex() + 1]
+  const prizes = after && !allClear ? [{ kind: 'stage', label: `퀘스트 ${schoolOf(after.school).name} ${after.name}` }, ...unlocksAt(after.id)] : []
+  const nextGoal = allClear ? '' : `
+  <div class="panel nextgoal">
+    <div class="eyebrow">다음 목표 <span class="num">· Lv.${playerLevel() + 1}까지</span></div>
+    <div class="ngmain"><span class="smark" lang="ja">${schoolOf(nextSt.school).mark}</span>
+      <div><b>${schoolOf(nextSt.school).name} ${nextSt.name} 통과하기</b><small>10문제 중 ${PASS}개 이상 맞히면 통과</small></div>
+      <button class="btn pri" data-act="questContinue">도전</button></div>
+    ${prizes.length ? `<div class="ngprize"><span>통과하면 열려요</span>${prizes.map(u => `<span class="ktag ${u.kind}">${u.label}</span>`).join('')}</div>` : ''}
+    <div class="row prog"><div class="label">퀘스트 진행<span class="num">${clearedCount()} / ${STAGES.length}</span></div>
+      <div class="bar"><i style="width:${clearedCount() / STAGES.length * 100}%"></i></div></div>
+  </div>`
 
   // 오늘의 한자
   const dk = dailyKanji(), k = KANJI[dk], [ew, er, em] = k.examples[0]
@@ -374,6 +393,7 @@ function homeView() {
     <div class="hero-mascot">${mascot('mascot', '')}<span class="says">${hello}</span></div>
     <div class="hero-text">
       <span class="hero-date">${date} ${weekday}</span>
+      <span class="lvchip"><b class="num">Lv.${playerLevel()}</b>${rankName()}</span>
       <h1>오늘의 공부</h1>
       <p>${lead}</p>
       <div class="hero-actions">
@@ -382,6 +402,7 @@ function homeView() {
       </div>
     </div>
   </section>
+  ${nextGoal}
   <div class="homegrid">${todayKanji}${stampCard}</div>
   <div class="panel goals">
     <div class="eyebrow">오늘의 목표</div>
@@ -390,7 +411,8 @@ function homeView() {
   </div>
   <div class="panel">
     <div class="hd">지금까지</div>
-    ${bar('초등 한자 전체', allK, totalK)}
+    ${bar('딴 배지', progress.badges.length, BADGES.length)}
+    ${bar('한자 전체', allK, totalK)}
     ${bar('중학 한자', progress.seenKanji.filter(c => KANJI[c] && KANJI[c].grade >= 7).length, Object.values(KANJI).filter(k => k.grade >= 7).length || 1110)}
     ${bar('동사 카드', seenCount('verb'), WORDS.length)}
     ${bar('형용사 카드', seenCount('adj'), ADJECTIVES.length)}
@@ -410,16 +432,19 @@ function kanjiList(grade) {
   return Object.keys(KANJI).filter(c => KANJI[c].grade === grade)
 }
 
-// 고등 한자 퀴즈는 퀘스트에서 중학교를 졸업해야 열린다
-function highUnlocked() { return progress.graduated.includes('mid') }
-
 function kanjiGrades() {
   const g = [...new Set(Object.values(KANJI).map(k => k.grade))].sort((a, b) => a - b)
   return [...g, ...[10, 11, 12].filter(x => highList(x).length)]
 }
+// 학년 탭: 잠긴 학년에는 자물쇠
+function gradeTabs() {
+  return kanjiGrades().map(g => { const open = isOpen('kanji', g)
+    return `<button class="${g === state.grade ? 'on' : ''}${open ? '' : ' locked'}" data-act="grade" data-grade="${g}">${open ? '' : LOCK}${gradeName(g)}</button>` }).join('')
+}
 
 // 고등 한자: 단어 목록 (누르면 위에 읽기·뜻과 쓰인 한자 카드)
 function highView() {
+  if (!isOpen('kanji', state.grade)) return kanjiBanner('고등 한자') + `<div class="tabs">${gradeTabs()}</div>` + lockedPanel(kanjiPackLabel(state.grade), unlockHint('kanji', state.grade))
   const list = highList(state.grade)
   const seen = list.filter(e => progress.seenHigh.includes(e[0])).length
   const rows = list.map(([w, r, m]) => {
@@ -430,7 +455,7 @@ function highView() {
   const detail = open ? `<div class="panel" id="kdetail">
       <div class="hkhead"><span class="hkbig" lang="ja"><ruby>${open[0]}<rt>${open[1]}</rt></ruby></span><span class="hkm">${open[2]}</span></div>
       ${kanjiInfo(open[0])}</div>` : ''
-  const tabs = kanjiGrades().map(g => `<button class="${g === state.grade ? 'on' : ''}" data-act="grade" data-grade="${g}">${gradeName(g)}</button>`).join('')
+  const tabs = gradeTabs()
   const NOTE = { 10: '단어 전체에 붙는 특수한 읽기예요. 한자 하나하나의 음으로는 읽을 수 없어요', 11: '네 글자로 된 관용 표현이에요', 12: '일본 사람도 자주 틀리는 읽기예요' }
   return `
   <section class="banner">
@@ -438,19 +463,27 @@ function highView() {
     <div class="banner-text"><h1>고등 한자</h1><p><span class="num">${progress.seenHigh.length} / ${[10, 11, 12].reduce((n, g) => n + highList(g).length, 0)}</span>개를 봤어요</p></div>
   </section>
   <div class="tabs">${tabs}</div>
-  <div class="subbar"><p class="sub">${gradeLong(state.grade)} ${list.length}개 · 본 단어 <span class="num">${seen} / ${list.length}</span></p>${highUnlocked() ? `<button class="btn" data-act="kanjiQuiz">${gradeName(state.grade)} 한자 퀴즈</button>` : `<button class="btn" disabled>${icon('lock')}퀴즈 잠김</button>`}</div>
-  ${highUnlocked() ? '' : '<p class="locknote">퀘스트에서 중학교 졸업 시험을 통과하면 고등 한자 퀴즈가 열려요</p>'}
+  <div class="subbar"><p class="sub">${gradeLong(state.grade)} ${list.length}개 · 본 단어 <span class="num">${seen} / ${list.length}</span></p><button class="btn" data-act="kanjiQuiz">${gradeName(state.grade)} 한자 퀴즈</button></div>
   ${detail}
   <div class="panel"><p class="hknote">${NOTE[state.grade]}</p><div class="hklist">${rows}</div>
     <div class="hint">단어를 누르면 읽는 법과 쓰인 한자가 나와요 · 본 단어에는 빨간 점</div></div>`
 }
 
+function kanjiBanner(title) {
+  const openK = kanjiGrades().filter(g => g <= 9 && isOpen('kanji', g)).reduce((n, g) => n + kanjiList(g).length, 0)
+  return `<section class="banner">
+    <img src="${IMAGES.kanji}" alt="벚꽃 핀 학교 가는 길, 돌담 위의 빨간 란도셀" width="1680" height="720">
+    <div class="banner-text"><h1>${title}</h1><p>열린 한자 <span class="num">${openK} / ${Object.keys(KANJI).length}</span>자</p></div>
+  </section>`
+}
+
 function kanjiView() {
   if (state.grade >= 10) return highView()
+  if (!isOpen('kanji', state.grade)) return kanjiBanner(state.grade >= 7 ? '중학 상용 한자' : '초등 필수 한자') + `<div class="tabs">${gradeTabs()}</div>` + lockedPanel(kanjiPackLabel(state.grade), unlockHint('kanji', state.grade))
   const grades = kanjiGrades()
   const list = kanjiList(state.grade)
   const seen = list.filter(c => progress.seenKanji.includes(c)).length
-  const tabs = grades.map(g => `<button class="${g === state.grade ? 'on' : ''}" data-act="grade" data-grade="${g}">${gradeName(g)}</button>`).join('')
+  const tabs = gradeTabs()
   const sub = `${state.grade <= 6 ? `초등 ${state.grade}학년` : `중학 ${state.grade - 6}묶음 (자주 쓰는 순)`} 한자 ${list.length}자 · 본 한자 <span class="num">${seen} / ${list.length}</span>`
   const cells = list.map(c => {
     const cls = ['masu', 'kcell', progress.seenKanji.includes(c) ? 'seen' : '', state.kanji === c ? 'on' : ''].join(' ')
@@ -506,8 +539,12 @@ const CARD_TYPES = {
   noun: { label: '명사', list: NOUN_LIST, prefix: 'n:' },
   high: { label: '고등 한자', list: HIGH_CARDS, prefix: 'h:' },
 }
-function cardList() { return CARD_TYPES[state.cardType].list }
-function cardIndex() { return state.cardIdx[state.cardType] }
+function cardOpen(type, x) {
+  return type === 'verb' ? isOpen('verb', verbLevel(x)) : type === 'high' ? isOpen('kanji', HK_SET_GRADE[x.set]) : true
+}
+function openCards(type) { return CARD_TYPES[type].list.filter(x => cardOpen(type, x)) }
+function cardList() { return openCards(state.cardType) }
+function cardIndex() { return Math.min(state.cardIdx[state.cardType], Math.max(0, cardList().length - 1)) }
 function seenKey(type, id) { return CARD_TYPES[type].prefix + id }
 function seenCount(type) { return CARD_TYPES[type].list.filter(x => progress.seen[seenKey(type, x.id)]).length }
 
@@ -518,6 +555,7 @@ function optionText(x) {
 function verbOptions(selected) {
   return Object.entries(VERB_LEVELS).map(([lv, name]) => {
     const items = WORDS.map((x, i) => [x, i]).filter(([x]) => verbLevel(x) === lv)
+    if (items.length && !isOpen('verb', lv)) return `<optgroup label="${name} 동사 ${items.length}개 · 잠김" disabled></optgroup>`
     return items.length ? `<optgroup label="${name} 동사 ${items.length}개">${items.map(([x, i]) => `<option value="${i}" ${i === selected ? 'selected' : ''}>${optionText(x)}</option>`).join('')}</optgroup>` : ''
   }).join('')
 }
@@ -526,6 +564,7 @@ function cardOptions() {
   if (state.cardType === 'verb') return verbOptions(sel)
   if (state.cardType === 'high') return Object.entries(HK_SETS).map(([s, name]) => {
     const items = list.map((x, i) => [x, i]).filter(([x]) => x.set === s)
+    if (!items.length) return `<optgroup label="${name} ${highList(HK_SET_GRADE[s]).length}개 · 잠김" disabled></optgroup>`
     return `<optgroup label="${name} ${items.length}개">${items.map(([x, i]) => `<option value="${i}" ${i === sel ? 'selected' : ''}>${optionText(x)}</option>`).join('')}</optgroup>`
   }).join('')
   if (state.cardType !== 'noun') return list.map((x, i) => `<option value="${i}" ${i === sel ? 'selected' : ''}>${optionText(x)}</option>`).join('')
@@ -559,7 +598,13 @@ function adjTable(a) {
 
 function cardsView() {
   const type = state.cardType, list = cardList(), i = cardIndex(), w = list[i]
-  const tabs = Object.entries(CARD_TYPES).map(([t, c]) => `<button class="${t === type ? 'on' : ''}" data-act="cardType" data-type="${t}">${c.label}<span class="num">${c.list.length}</span></button>`).join('')
+  const tabs = Object.entries(CARD_TYPES).map(([t, c]) => { const n = openCards(t).length
+    return `<button class="${t === type ? 'on' : ''}${n ? '' : ' locked'}" data-act="cardType" data-type="${t}">${c.label}<span class="num">${n ? n : LOCK}</span></button>` }).join('')
+  if (!w) return `<div class="tabs cardtabs">${tabs}</div>` + lockedPanel(`${CARD_TYPES[type].label} 카드 ${CARD_TYPES[type].list.length}장`, type === 'high' ? unlockHint('kanji', 10) : '')
+  // 다음에 열릴 카드 묶음 안내
+  const lockedN = CARD_TYPES[type].list.length - list.length
+  const nextLock = lockedN && i === list.length - 1
+    ? `<p class="locknote">${LOCK}다음 카드 ${lockedN}장은 ${type === 'verb' ? unlockHint('verb', Object.keys(UNLOCK_AT.verb).find(l => !isOpen('verb', l))) : unlockHint('kanji', [10, 11, 12].find(g => !isOpen('kanji', g)))}</p>` : ''
   const sub = type === 'verb' ? `${VERB_LEVELS[verbLevel(w)]} 동사 · ${GROUP_LABEL[w.group]}` : type === 'adj' ? ADJ_LABEL[w.type] : type === 'high' ? `고등 ${w.cat}` : w.cat
   const hasKanji = w.ruby.some(p => p[1] && [...p[0]].some(ch => KANJI[ch]))
   const hint = [w.note ? w.note.replace(/\.$/, '') : '', hasKanji ? '한자를 누르면 음독과 훈독이 나와요' : ''].filter(Boolean).join(' · ')
@@ -580,11 +625,14 @@ function cardsView() {
       ${type === 'verb' ? '<button class="btn" data-act="showConj">변화표 보기</button>' : ''}
       <button class="btn pri" data-act="nextCard" ${i === list.length - 1 ? 'disabled' : ''}>다음${icon('right')}</button>
     </div>
+    ${nextLock}
   </div>`
 }
 
 function markSeen() {
   const w = cardList()[cardIndex()]
+  if (!w) return
+  state.cardIdx[state.cardType] = cardIndex()
   const key = seenKey(state.cardType, w.id)
   progress.seen[key] = (progress.seen[key] || 0) + 1
   if (state.cardType === 'high' && !progress.seenHigh.includes(w.kanji)) progress.seenHigh.push(w.kanji)   // 한자 화면의 "본 단어"와 함께 센다
@@ -601,9 +649,11 @@ function conjView() {
 
 // 전체 표: 동사 30개 × 4형태. 어미(ます 등)는 흐리게 해서 바뀌는 부분이 보이게 한다.
 function conjAllView() {
-  const lvOK = w => !state.conjLevel || state.conjLevel === 'all' || verbLevel(w) === state.conjLevel
+  if (state.conjLevel && state.conjLevel !== 'all' && !isOpen('verb', state.conjLevel)) state.conjLevel = 'all'
+  const lvOK = w => isOpen('verb', verbLevel(w)) && (!state.conjLevel || state.conjLevel === 'all' || verbLevel(w) === state.conjLevel)
   const counts = [0, 1, 2, 3].map(g => WORDS.filter(w => lvOK(w) && (!g || w.group === g)).length)
-  const levels = ['all', ...Object.keys(VERB_LEVELS)].map(l => `<button class="${(state.conjLevel || 'all') === l ? 'on' : ''}" data-act="conjLevel" data-level="${l}">${l === 'all' ? '전체 수준' : VERB_LEVELS[l]}<span class="num">${l === 'all' ? WORDS.length : WORDS.filter(w => verbLevel(w) === l).length}</span></button>`).join('')
+  const levels = ['all', ...Object.keys(VERB_LEVELS)].map(l => { const open = l === 'all' || isOpen('verb', l)
+    return `<button class="${(state.conjLevel || 'all') === l ? 'on' : ''}${open ? '' : ' locked'}" data-act="conjLevel" data-level="${l}" ${open ? '' : `disabled title="${unlockHint('verb', l)}"`}>${open ? '' : LOCK}${l === 'all' ? '열린 동사 전체' : VERB_LEVELS[l]}<span class="num">${l === 'all' ? WORDS.filter(w => isOpen('verb', verbLevel(w))).length : WORDS.filter(w => verbLevel(w) === l).length}</span></button>` }).join('')
   const filters = levels + '<span class="fsep"></span>' + [0, 1, 2, 3].map(g => `<button class="${state.conjGroup === g ? 'on' : ''}" data-act="conjGroup" data-group="${g}">${g ? `${g}그룹` : '모든 그룹'}<span class="num">${counts[g]}</span></button>`).join('')
   const form = (w, f) => `<td lang="ja">${rubyHTML(masuStem(w))}<span class="end">${ENDINGS[f]}</span></td>`
   const rows = WORDS.map((w, i) => ({ w, i })).filter(({ w }) => lvOK(w) && (!state.conjGroup || w.group === state.conjGroup))
@@ -624,6 +674,8 @@ function conjAllView() {
 }
 
 function conjOneView() {
+  const openN = WORDS.filter(x => isOpen('verb', verbLevel(x))).length   // 동사는 쉬운 수준부터 차례로 들어 있다
+  if (state.verb >= openN) state.verb = openN - 1
   const w = WORDS[state.verb]
   const cell = f => {
     const c = conjugate(w, f)
@@ -637,7 +689,7 @@ function conjOneView() {
   <div class="picker">
     <button class="btn icon-only" data-act="prevVerb" aria-label="이전 동사" ${state.verb === 0 ? 'disabled' : ''}>${icon('left')}</button>
     <select data-act="pickVerb" aria-label="동사 고르기">${options}</select>
-    <button class="btn icon-only" data-act="nextVerb" aria-label="다음 동사" ${state.verb === WORDS.length - 1 ? 'disabled' : ''}>${icon('right')}</button>
+    <button class="btn icon-only" data-act="nextVerb" aria-label="다음 동사" ${state.verb >= openN - 1 ? 'disabled' : ''}>${icon('right')}</button>
   </div>
   <div class="panel">
     <div class="verbhead">${masuRow(w.ruby, { size: 'sm' })}<div><div class="vmean">${w.meaning}</div><div class="vgroup">${VERB_LEVELS[verbLevel(w)]} 동사 · ${GROUP_LABEL[w.group]}</div></div></div>
@@ -670,8 +722,11 @@ function grammarView() {
   const lv = state.grammarLevel
   const tabs = [...LEVELS, 'saved'].map(l => {
     const n = l === 'saved' ? saved.length : GRAMMAR.filter(g => g.level === l).length
-    return `<button class="${lv === l ? 'on' : ''}" data-act="grammarLevel" data-level="${l}">${l === 'saved' ? '★ 저장' : l}<span class="num">${n}</span></button>`
+    const open = l === 'saved' || isOpen('grammar', l)
+    return `<button class="${lv === l ? 'on' : ''}${open ? '' : ' locked'}" data-act="grammarLevel" data-level="${l}">${open ? '' : LOCK}${l === 'saved' ? '★ 저장' : l}<span class="num">${n}</span></button>`
   }).join('')
+  const ghero = `<div class="ghero">${mascot('mascot')}<div><h1>JLPT 문법</h1><p>N5 기초부터 N1 핵심까지 · 헷갈리는 건 저장해 두고 다시 봐요</p></div></div>`
+  if (lv !== 'saved' && !isOpen('grammar', lv)) return ghero + `<div class="tabs gtabs">${tabs}</div>` + lockedPanel(`${lv} 문법 ${GRAMMAR.filter(g => g.level === lv).length}개`, unlockHint('grammar', lv))
   const list = lv === 'saved' ? GRAMMAR.filter(g => saved.includes(g.id)) : GRAMMAR.filter(g => g.level === lv)
   const seen = list.filter(g => progress.seenGrammar.includes(g.id)).length
   const items = list.map(g => {
@@ -693,7 +748,7 @@ function grammarView() {
   const empty = lv === 'saved' && !list.length
     ? `<div class="gempty">${mascot('think')}<p>헷갈리는 문법에서 <b>☆ 저장</b>을 누르면 여기에 모여요</p></div>` : ''
   return `
-  <div class="ghero">${mascot('mascot')}<div><h1>JLPT 문법</h1><p>N5 기초부터 N1 핵심까지 · 헷갈리는 건 저장해 두고 다시 봐요</p></div></div>
+  ${ghero}
   <div class="tabs gtabs">${tabs}</div>
   ${list.length ? `<div class="subbar"><p class="sub">${lv === 'saved' ? `저장한 문법 ${list.length}개` : `${lv} 문법 ${list.length}개 · 본 문법 <span class="num">${seen} / ${list.length}</span>`}</p>
     <button class="btn" data-act="grammarQuiz">${lv === 'saved' ? '저장한 문법 퀴즈' : `${lv} 문법 퀴즈`}</button></div>` : ''}
@@ -733,10 +788,14 @@ function questView() {
       <div class="path">${nodes}</div></section>`
   }).join('')
   return `
-  <div class="questhead">${mascot('mascot')}<div><h1>일본어 학교 퀘스트</h1>
-    <p>모은 별 <b class="num">${totalStars}</b> / ${STAGES.length * 3} · 다음 ${curSc.name} ${curSt.name}</p></div></div>
+  <div class="questhead">${mascot('mascot')}<div><span class="lvchip"><b class="num">Lv.${playerLevel()}</b>${rankName()}</span><h1>일본어 학교 퀘스트</h1>
+    <p>모은 별 <b class="num">${totalStars}</b> / ${STAGES.length * 3} · 배지 <b class="num">${progress.badges.length}</b> / ${BADGES.length}</p></div></div>
   <div class="questbar"><button class="btn pri" data-act="questContinue">이어서 도전</button><button class="btn" data-act="quizTab" data-tab="free">자유 연습</button></div>
-  ${schools}`
+  ${schools}
+  <section class="panel badgebox">
+    <div class="hd">배지<span class="num">${progress.badges.length} / ${BADGES.length}</span></div>
+    <div class="badges">${BADGES.map(b => badgeHTML(b, progress.badges.includes(b.id))).join('')}</div>
+  </section>`
 }
 
 // 스테이지 결과 + 졸업장
@@ -770,7 +829,9 @@ function stageDoneView() {
         <div class="stat"><b class="num">${qz.best}</b><small>최고 연속</small></div>
       </div>
     </div>
+    ${qz.levelUp ? `<div class="levelup"><span class="lvbig num">Lv.${qz.levelUp}</span><span>레벨 업 · ${rankName()}</span></div>` : ''}
     ${diploma}
+    ${rewardsHTML(qz)}
     ${list}
     <div class="actions">${nextBtn}<button class="btn" data-act="toMap">퀘스트 지도</button></div>
   </div>`
@@ -790,11 +851,11 @@ function quizHeader() {
   const back = `<button class="btn icon-only" data-act="quizTab" data-tab="quest" aria-label="퀘스트 지도로">${icon('left')}</button>`
   // 한 줄로: [←][동사 | 한자 | 문법] + 동사는 수준, 한자는 학년, 문법은 급수 고르기
   const grades = state.quizMode === 'verb'
-    ? `<select class="gradesel" data-act="verbLevelSel" aria-label="동사 수준 고르기">${['all', 'elem', 'mid', 'high'].map(l => `<option value="${l}" ${state.verbQuizLevel === l ? 'selected' : ''}>${l === 'all' ? '전체 동사' : `${VERB_LEVELS[l]} 동사`}</option>`).join('')}</select>`
+    ? `<select class="gradesel" data-act="verbLevelSel" aria-label="동사 수준 고르기">${['all', 'elem', 'mid', 'high'].map(l => { const lock = l !== 'all' && !isOpen('verb', l); return `<option value="${l}" ${state.verbQuizLevel === l ? 'selected' : ''}${lock ? ' disabled' : ''}>${l === 'all' ? '열린 동사 전체' : `${VERB_LEVELS[l]} 동사${lock ? ' (잠김)' : ''}`}</option>` }).join('')}</select>`
     : state.quizMode === 'kanji'
-    ? `<select class="gradesel" data-act="quizGradeSel" aria-label="학년 고르기">${[0, ...kanjiGrades()].map(g => { const lock = g >= 10 && !highUnlocked(); return `<option value="${g}" ${state.quizGrade === g ? 'selected' : ''}${lock ? ' disabled' : ''}>${g ? (g <= 6 ? `초등 ${g}학년` : g <= 9 ? `중학 ${g - 6}묶음` : gradeLong(g) + (lock ? ' (잠김)' : '')) : '전체 한자'}</option>` }).join('')}</select>`
+    ? `<select class="gradesel" data-act="quizGradeSel" aria-label="학년 고르기">${[0, ...kanjiGrades()].map(g => { const lock = g > 0 && !isOpen('kanji', g); return `<option value="${g}" ${state.quizGrade === g ? 'selected' : ''}${lock ? ' disabled' : ''}>${g ? (g <= 6 ? `초등 ${g}학년` : g <= 9 ? `중학 ${g - 6}묶음` : gradeLong(g)) + (lock ? ' (잠김)' : '') : '열린 한자 전체'}</option>` }).join('')}</select>`
     : state.quizMode === 'grammar'
-    ? `<select class="gradesel" data-act="quizLevelSel" aria-label="급수 고르기">${[...LEVELS, 'all', 'saved'].map(l => `<option value="${l}" ${state.quizLevel === l ? 'selected' : ''}>${l === 'all' ? '전체 급수' : l === 'saved' ? `★ 저장한 문법 (${progress.savedGrammar.length})` : l}</option>`).join('')}</select>`
+    ? `<select class="gradesel" data-act="quizLevelSel" aria-label="급수 고르기">${[...LEVELS, 'all', 'saved'].map(l => { const lock = LEVELS.includes(l) && !isOpen('grammar', l); return `<option value="${l}" ${state.quizLevel === l ? 'selected' : ''}${lock ? ' disabled' : ''}>${l === 'all' ? '열린 급수 전체' : l === 'saved' ? `★ 저장한 문법 (${progress.savedGrammar.length})` : l + (lock ? ' (잠김)' : '')}</option>` }).join('')}</select>`
     : ''
   return `<div class="quizbar">${back}<div class="tabs">${modes}</div>${grades}</div>`
 }
@@ -870,6 +931,7 @@ function quizDoneView() {
         <div class="stat"><b class="num">${qz.best}</b><small>최고 연속</small></div>
       </div>
     </div>
+    ${rewardsHTML(qz)}
     ${list}
     <div class="actions"><button class="btn pri" data-act="restartQuiz">다시 풀기</button><button class="btn" data-go="home">처음으로</button></div>
   </div>`
@@ -889,6 +951,7 @@ function pick(i) {
   if (ok) {
     qz.right++
     qz.combo++; qz.best = Math.max(qz.best, qz.combo); qz.comboPop = qz.combo >= 2
+    progress.bestCombo = Math.max(progress.bestCombo || 0, qz.combo)
     qz.say = qz.combo >= 3 ? `${qz.combo}연속이에요, 대단해요` : pickOne(CHEERS)
     if (!progress[learned].includes(q.key)) progress[learned].push(q.key)
     progress[wrong] = progress[wrong].filter(k => k !== q.key)
@@ -941,7 +1004,7 @@ const ACTIONS = {
     if (state.quizTab === 'free') newQuiz()
     window.scrollTo(0, 0)
   },
-  grammarQuiz() { state.quizMode = 'grammar'; state.quizLevel = state.grammarLevel; go('quiz'); return true },
+  grammarQuiz() { if (state.grammarLevel !== 'saved' && !isOpen('grammar', state.grammarLevel)) return; state.quizMode = 'grammar'; state.quizLevel = state.grammarLevel; go('quiz'); return true },
   grammarOpen(btn) {
     const id = btn.dataset.id
     state.grammarOpen = state.grammarOpen === id ? null : id
@@ -970,12 +1033,18 @@ const ACTIONS = {
         const total = qz.list.length
         qz.stars = qz.right === total ? 3 : qz.right >= total - 1 ? 2 : qz.right >= Math.ceil(total * PASS / 10) ? 1 : 0
         const st = STAGES.find(s => s.id === state.stage)
+        const firstClear = qz.stars > 0 && !stageCleared(st.id)
         if (qz.stars > stageStars(st.id)) progress.stages[st.id] = qz.stars
+        const next = STAGES[stageIndex(st.id) + 1]
+        if (firstClear && next) qz.unlocked = [{ kind: 'stage', label: `${schoolOf(next.school).name} ${next.name}` }, ...unlocksAt(next.id)]
+        if (firstClear) qz.levelUp = playerLevel()
         if (qz.stars && st.boss && !progress.graduated.includes(st.school)) { progress.graduated.push(st.school); qz.graduated = true }
         bonus = qz.stars * 10 + (qz.graduated ? 100 : 0)
       }
       qz.xp += 20 + bonus
       bumpToday('quizzes')
+      qz.newBadges = checkBadges()
+      saveProgress()
       render()
       addXP(20 + bonus)
       SFX.done()
@@ -990,7 +1059,7 @@ const ACTIONS = {
   quizMode(btn) { state.quizMode = btn.dataset.mode; newQuiz() },
   quizGrade(btn) { state.quizGrade = Number(btn.dataset.grade); newQuiz() },
   restartQuiz() { newQuiz() },
-  kanjiQuiz() { if (state.grade >= 10 && !highUnlocked()) return; state.quizMode = 'kanji'; state.quizGrade = state.grade; go('quiz'); return true },
+  kanjiQuiz() { if (!isOpen('kanji', state.grade)) return; state.quizMode = 'kanji'; state.quizGrade = state.grade; go('quiz'); return true },
   pickCard(el) { state.cardIdx[state.cardType] = Number(el.value); state.kanji = null; markSeen() },
   conjGroup(btn) { state.conjGroup = Number(btn.dataset.group) },
   conjLevel(btn) { state.conjLevel = btn.dataset.level },
@@ -1057,6 +1126,9 @@ document.addEventListener('change', e => {
 
 // ───── 오프라인 (홈 화면에 추가해서 쓸 때) ─────
 let offlineReady = false
+
+// 예전 기록으로 이미 딴 배지는 조용히 채워 둔다
+checkBadges(); saveProgress()
 
 // 화면을 먼저 그린다. 오프라인 준비가 실패해도 앱은 열려야 한다.
 render()

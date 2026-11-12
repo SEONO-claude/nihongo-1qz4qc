@@ -564,3 +564,54 @@ main.homewide { max-width: 900px; }
   .feedback .fmascot { display: none; }
 }
 .locknote { margin: -4px 0 12px; color: var(--ink-3); font-size: 13px; }
+
+/* ───── 레벨링 · 성취 ───── */
+.tabs button.locked, .filters button.locked { color: var(--ink-3); }
+.tabs button.locked .icon, .filters button.locked .icon, .locknote .icon { width: 14px; height: 14px; margin-right: 4px; vertical-align: -2px; stroke-width: 2; }
+.cardtabs button.locked .num .icon { width: 12px; height: 12px; margin: 0; }
+.locknote { margin: 0; padding: 0 20px 16px; text-align: center; color: var(--ink-3); font-size: 13px; }
+.lockpanel { display: flex; align-items: center; gap: 16px; padding: 20px; }
+.lockpanel .mascot { width: 88px; height: 88px; flex: none; }
+.lockpanel b { display: flex; align-items: center; gap: 6px; font-family: var(--round); font-size: 19px; font-weight: 400; }
+.lockpanel b .icon { width: 18px; height: 18px; stroke-width: 2; color: var(--ink-3); }
+.lockpanel p { margin: 4px 0 12px; color: var(--ink-2); font-size: 14px; }
+
+.lvchip { display: inline-flex; align-items: center; gap: 6px; padding: 2px 10px 2px 4px; border-radius: 999px; background: var(--card); border: 2px solid var(--line); font-family: var(--round); font-size: 14px; color: var(--ink-2); }
+.lvchip b { padding: 0 8px; border-radius: 999px; background: var(--sun); color: #5a3d00; font-family: var(--sans); font-size: 12px; font-weight: 600; line-height: 20px; }
+.questhead .lvchip { margin-bottom: 4px; }
+
+.nextgoal { padding: 16px 20px 4px; --c: var(--sun); --cd: var(--sun-d); }
+.ngmain { display: flex; align-items: center; gap: 12px; margin: 8px 0 12px; }
+.ngmain > div { flex: 1; min-width: 0; }
+.ngmain b { display: block; font-family: var(--round); font-size: 18px; font-weight: 400; }
+.ngmain small { color: var(--ink-3); font-size: 13px; }
+.ngprize { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 4px; font-size: 13px; color: var(--ink-2); }
+.nextgoal .row.prog { padding: 8px 0 16px; border: 0; }
+
+.ktag { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 13px; background: var(--raised); color: var(--ink-2); }
+.ktag.stage { background: var(--sun-t); color: var(--sun-d); }
+.ktag.kanji { background: var(--pink-t); color: var(--pink-d); }
+.ktag.verb { background: var(--sky-t); color: var(--sky-d); }
+.ktag.grammar { background: var(--mint-t, var(--leaf-t)); color: var(--leaf-d); }
+
+.levelup { display: flex; flex-direction: column; align-items: center; gap: 2px; margin: 0 16px 8px; padding: 14px; border-radius: 16px; background: var(--sun-t); font-family: var(--round); font-size: 16px; color: var(--sun-d); animation: popIn 600ms var(--spring) 300ms both; }
+.lvbig { font-family: var(--sans); font-size: 34px; font-weight: 600; color: var(--ink); line-height: 1.1; }
+
+.rewards { margin: 0 16px 8px; display: grid; gap: 12px; }
+.newopen ul { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 6px; }
+.newopen li { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-radius: 12px; background: var(--raised); font-size: 15px; animation: popIn 500ms var(--spring) var(--d) both; }
+.newopen li .ktag { flex: none; }
+.newbadges .badges { margin-top: 8px; }
+
+.badgebox .badges { padding: 4px 20px 20px; }
+.badges { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 10px; }
+.badge { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 12px 6px; border-radius: 14px; background: var(--raised); text-align: center; color: var(--ink-3); }
+.badge .bmark { display: grid; place-items: center; width: 52px; height: 52px; border-radius: 50%; border: 3px dashed var(--edge); font-family: var(--mincho); font-size: 24px; }
+.badge .bmark .icon { width: 20px; height: 20px; stroke-width: 2; }
+.badge b { font-family: var(--round); font-size: 14px; font-weight: 400; }
+.badge small { font-size: 11px; line-height: 1.35; }
+.badge.on { background: var(--card); border: 2px solid var(--line); color: var(--ink-2); }
+.badge.on b { color: var(--ink); }
+.badge.on .bmark { border: 3px solid #d2402e; color: #d2402e; transform: rotate(-8deg); }
+.badge.new .bmark { --r: -8deg; animation: stampIn 600ms var(--spring) 800ms both; }
+@media (max-width: 520px) { .lockpanel .mascot { width: 64px; height: 64px; } }

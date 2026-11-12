@@ -14,6 +14,9 @@ function shuffle(list) {
 
 function wordById(id) { return WORDS.find(w => w.id === id) }
 
+// 레벨링(level.js)이 있으면 잠긴 내용은 '전체' 퀴즈에서 뺀다
+function opened(kind, key) { return typeof isOpen !== 'function' || isOpen(kind, key) }
+
 // 틀린 문제 먼저, 나머지는 무작위로 채운다
 function pickKeys(wrongKeys, allKeys) {
   const valid = new Set(allKeys)
@@ -56,7 +59,7 @@ function makeVerbQuestion(key) {
 const VERB_LEVELS = { elem: '초등', mid: '중학', high: '고등' }
 function verbLevel(w) { return w.level || 'elem' }
 function verbKeys(level) {
-  return WORDS.filter(w => level === 'all' || verbLevel(w) === level).flatMap(w => FORMS.map(f => `${w.id}:${f}`))
+  return WORDS.filter(w => level === 'all' ? opened('verb', verbLevel(w)) : verbLevel(w) === level).flatMap(w => FORMS.map(f => `${w.id}:${f}`))
 }
 function buildVerbQuiz(wrongKeys, level = 'all') {
   return pickKeys(wrongKeys, verbKeys(level)).map(makeVerbQuestion)
@@ -241,7 +244,7 @@ function grammarById(id) { return GRAMMAR.find(g => g.id === id) }
 // level: 'N5'~'N1', 'all', 'saved'
 function grammarPool(level, saved) {
   if (level === 'saved') return GRAMMAR.filter(g => saved.includes(g.id))
-  return GRAMMAR.filter(g => level === 'all' || g.level === level)
+  return GRAMMAR.filter(g => level === 'all' ? opened('grammar', g.level) : g.level === level)
 }
 
 // 오답 보기는 같은 급수에서 고른다 (모자라면 전체에서)
@@ -301,7 +304,7 @@ function buildGrammarQuiz(level, saved, wrongKeys) {
 
 // grade 0 = 전체
 function kanjiPool(grade) {
-  return Object.keys(KANJI).filter(c => !grade || KANJI[c].grade === grade)
+  return Object.keys(KANJI).filter(c => grade ? KANJI[c].grade === grade : opened('kanji', KANJI[c].grade))
 }
 
 // 학년을 골랐으면 그 학년까지 배운 한자로만 된 예문을 읽기 문제로 쓴다
