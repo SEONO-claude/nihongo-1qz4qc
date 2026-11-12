@@ -785,3 +785,47 @@ main[data-view="talk"] { --acc: var(--sky); --acc-d: var(--sky-d); --acc-t: var(
 .gq.onoq { font-family: var(--jp); font-size: 40px; letter-spacing: 0.04em; }
 @media (max-width: 520px) { .quizbar .tabs button { padding: 0 7px; font-size: 14px; } }
 .choice.wrap { white-space: normal; line-height: 1.35; word-break: keep-all; padding-top: 8px; padding-bottom: 8px; }
+
+/* ───── 5단계: 미션 · 보물상자 · 복습 · 모의고사 · 마스터 · 성적표 ───── */
+.chestrow { display: flex; align-items: center; gap: 12px; margin-top: 12px; padding: 10px 12px; border-radius: 14px; background: var(--raised); font-size: 14px; color: var(--ink-2); }
+.chestrow.ready { background: var(--sun-t); }
+.chestrow.open { background: var(--leaf-t); }
+.chest { display: grid; place-items: center; flex: none; width: 46px; height: 46px; border-radius: 12px; background: linear-gradient(#ffd56b, #f0a81c); color: #7a4b00; font-family: var(--mincho); font-size: 24px; font-weight: 700; box-shadow: 0 3px 0 #c98a0e; }
+.chest.locked { filter: grayscale(1); opacity: 0.45; }
+.chest.shake { animation: chestShake 1.2s ease-in-out infinite; }
+@keyframes chestShake { 0%, 60%, 100% { transform: rotate(0); } 70% { transform: rotate(-8deg); } 80% { transform: rotate(8deg); } 90% { transform: rotate(-4deg); } }
+.challenge { padding: 16px 18px; display: flex; flex-direction: column; gap: 10px; }
+.chbig { display: flex; align-items: baseline; gap: 8px; }
+.chbig b { font-size: 40px; font-weight: 600; line-height: 1; color: var(--ink); }
+.chbig span { color: var(--ink-2); font-size: 14px; }
+.memlv { display: flex; gap: 6px; flex-wrap: wrap; font-size: 12px; }
+.memlv span { padding: 2px 10px; border-radius: 999px; }
+.memlv .w { background: var(--bad-t); color: var(--bad, #d2402e); }
+.memlv .m { background: var(--sun-t); color: var(--sun-d); }
+.memlv .s { background: var(--leaf-t); color: var(--leaf-d); }
+.chnote { margin: 0; font-size: 12px; color: var(--ink-3); }
+.mockbtns { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+.mockbtn { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 2px; border: 2px solid var(--line); border-bottom-width: 4px; border-radius: 12px; background: var(--card); color: var(--ink); font: inherit; cursor: pointer; }
+.mockbtn b { font-family: var(--round); font-size: 17px; font-weight: 400; }
+.mockbtn small { font-size: 11px; color: var(--ink-3); }
+.mockbtn.passed { border-color: #d2402e; }
+.mockbtn.passed small { color: #d2402e; }
+.mockbtn.locked { background: var(--raised); color: var(--ink-3); cursor: default; }
+.mockbtn .icon { width: 12px; height: 12px; }
+.mockres { margin: 0 16px 8px; padding: 16px; border-radius: 16px; background: var(--raised); text-align: center; }
+.mockres.pass { background: var(--sun-t); }
+.mockscore { position: relative; display: flex; justify-content: center; align-items: baseline; gap: 6px; }
+.mockscore b { font-size: 52px; font-weight: 600; line-height: 1.1; }
+.mockscore span { color: var(--ink-3); }
+.mockscore .passmark { position: absolute; right: 12%; top: -4px; width: 60px; height: 60px; font-size: 30px; color: #d2402e; }
+.mockres p { margin: 4px 0 12px; font-family: var(--round); font-size: 16px; color: var(--ink-2); }
+.mocksecs { display: grid; gap: 8px; text-align: left; }
+.mocksecs div { position: relative; display: flex; justify-content: space-between; padding: 6px 10px; border-radius: 10px; background: var(--card); overflow: hidden; font-size: 14px; }
+.mocksecs i { position: absolute; left: 0; bottom: 0; height: 3px; background: var(--leaf); }
+.masterpop { display: inline-block; margin-left: 8px; padding: 0 8px; border-radius: 999px; background: var(--sun); color: #5a3d00; font-size: 12px; line-height: 20px; animation: popIn 400ms var(--spring) both; }
+.gitem.mastered .gpattern::before { content: "★"; margin-right: 6px; color: var(--sun); }
+button.gradbadge { border: 0; cursor: pointer; font-family: var(--round); }
+.rcover { position: fixed; inset: 0; z-index: 45; display: grid; place-items: center; padding: 16px; background: rgba(28, 26, 36, 0.6); }
+.rcbox { width: min(420px, 100%); max-height: 100%; overflow: auto; padding: 14px; border-radius: 20px; background: var(--card); text-align: center; }
+.rcbox img { width: 100%; height: auto; border-radius: 10px; display: block; }
+.rcbox p { margin: 10px 0 4px; font-size: 13px; color: var(--ink-2); }

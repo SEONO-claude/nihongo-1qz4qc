@@ -460,3 +460,53 @@ function makeOnoQuestion(key) {
     choices: shuffle([o.word, ...pick3(x => x.word)].map(x => ({ html: x, ok: x === o.word }))) }
 }
 function buildOnoQuiz(cat, wrongKeys) { return pickKeys(wrongKeys, onoKeys(cat)).map(makeOnoQuestion) }
+
+// ───── 문제 키 하나로 문제 다시 만들기 (복습·모의고사) ─────
+function keyMode(k) {
+  if (/^(r|m|hk):/.test(k)) return 'kanji'
+  if (/^g[abcfjo]:/.test(k)) return 'grammar'
+  if (/^t[wmb]:/.test(k)) return 'talk'
+  if (/^o[mwf]:/.test(k)) return 'ono'
+  return 'verb'
+}
+function questionFromKey(k) {
+  try {
+    const mode = keyMode(k)
+    let q
+    if (k.startsWith('hk:')) q = makeHighKanjiQuestion(k)
+    else if (mode === 'kanji') { const c = k.split(':')[1]; if (!KANJI[c]) return null; const pool = kanjiPool(KANJI[c].grade); q = k.startsWith('r:') ? makeReadQuestion(k, pool) : makeMeaningQuestion(k, pool) }
+    else if (mode === 'grammar') { if (!grammarById(k.split(':')[1])) return null; q = makeGrammarQuestion(k) }
+    else if (mode === 'talk') { if (!talkScene(k.split(':')[1])) return null; q = makeTalkQuestion(k) }
+    else if (mode === 'ono') { if (!onoById(k.split(':')[1])) return null; q = makeOnoQuestion(k) }
+    else { if (!wordById(k.split(':')[0])) return null; q = makeVerbQuestion(k) }
+    q.mode = mode
+    return q
+  } catch { return null }
+}
+// 마스터 별을 세는 단위: 문법은 문법 하나, 한자는 글자 하나, 회화는 문장 하나
+function masterItem(k) {
+  const p = k.split(':')
+  if (/^(r|m):/.test(k)) return 'k:' + p[1]
+  if (k.startsWith('hk:')) return 'h:' + p[1] + ':' + p[2]
+  if (/^g/.test(p[0])) return 'g:' + p[1]
+  if (/^t/.test(p[0])) return 't:' + p[1] + ':' + p[2]
+  if (/^o/.test(p[0])) return 'o:' + p[1]
+  return 'v:' + p[0]
+}
+
+// ───── JLPT 모의고사: 문자 10 · 문법 15 · 표현 5 ─────
+const MOCK_KANJI = { N5: [1, 2], N4: [3, 4], N3: [5, 6, 7], N2: [8, 9], N1: [9, 10, 11, 12] }
+function buildMock(level) {
+  const tag = (q, sec) => { q.section = sec; return q }
+  const grades = MOCK_KANJI[level]
+  const kk = grades.flatMap(g => g >= 10 ? highKanjiKeys([HK_GRADE[g]]).filter(k => k.endsWith(':r'))
+    : kanjiPool(g).flatMap(c => readIndexes(c, g).map(i => `r:${c}:${i}`)))
+  const gk = GRAMMAR.filter(g => g.level === level).flatMap(grammarKeys).filter(k => /^g[fjob]:/.test(k))
+  const tk = talkKeys('all').filter(k => /^t[wm]:/.test(k))
+  const qs = [
+    ...shuffle(kk).slice(0, 40).map(questionFromKey).filter(Boolean).slice(0, 10).map(q => tag(q, '문자')),
+    ...shuffle(gk).slice(0, 40).map(questionFromKey).filter(Boolean).slice(0, 15).map(q => tag(q, '문법')),
+    ...shuffle(tk).slice(0, 40).map(questionFromKey).filter(Boolean).slice(0, 5).map(q => tag(q, '표현')),
+  ]
+  return qs
+}
