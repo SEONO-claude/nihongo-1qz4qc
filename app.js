@@ -215,12 +215,15 @@ const IMAGES = window.APP_IMAGES || {
   sad: 'images/mascot-sad.webp', party: 'images/mascot-party.webp',
 }
 // 고양이 친구들 (묶은 페이지에서는 APP_IMAGES에 이미 들어 있다)
-for (const id of ['kuro', 'shiro', 'mikan', 'moka', 'hachi', 'gin', 'tora', 'maru', 'sabi', 'mofu']) IMAGES['cat-' + id] = IMAGES['cat-' + id] || `images/cat-${id}.webp`
+for (const id of ['kuro', 'shiro', 'mikan', 'moka', 'hachi', 'gin', 'tora', 'maru', 'sabi', 'mofu']) {
+  IMAGES['cat-' + id] = IMAGES['cat-' + id] || `images/cat-${id}.webp`
+  for (const m of ['think', 'cheer', 'sad', 'party']) IMAGES[`cat-${id}-${m}`] = IMAGES[`cat-${id}-${m}`] || `images/cat-${id}-${m}.webp`
+}
 // 미케 그림 (포즈가 없으면 기본 모습)
 function mascot(mood = 'mascot', cls = 'mascot') {
-  // 단짝이 미케가 아니면 그 고양이가 나온다 (표정 그림은 미케만 있음)
+  // 단짝이 미케가 아니면 그 고양이가 나온다 (표정: think 생각, cheer 정답, sad 응원, party 축하)
   const b = typeof buddy === 'function' ? buddy() : { id: 'mike', name: '미케' }
-  const src = b.id === 'mike' ? (IMAGES[mood] || IMAGES.mascot) : catImage(b)
+  const src = b.id === 'mike' ? (IMAGES[mood] || IMAGES.mascot) : (IMAGES[`cat-${b.id}-${mood}`] || catImage(b))
   return src ? `<img class="${cls}" src="${src}" alt="${b.name}" width="320" height="320">` : ''
 }
 const CHEERS = ['정답이에요', '잘했어요', '완벽해요', '좋아요, 그대로 가요', '역시 내 친구']
