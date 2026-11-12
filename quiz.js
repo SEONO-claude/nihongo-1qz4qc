@@ -76,14 +76,14 @@ const SCHOOLS = [
       { id: 'e4', name: '4학년', parts: [{ t: 'kanji', grades: [4], n: 4 }, { t: 'verb', level: 'elem', n: 3 }, { t: 'grammar', levels: ['N5'], n: 3 }] },
       { id: 'e5', name: '5학년', parts: [{ t: 'kanji', grades: [5], n: 4 }, { t: 'verb', level: 'elem', n: 3 }, { t: 'grammar', levels: ['N4'], n: 3 }] },
       { id: 'e6', name: '6학년', parts: [{ t: 'kanji', grades: [6], n: 4 }, { t: 'verb', level: 'elem', n: 3 }, { t: 'grammar', levels: ['N4'], n: 3 }] },
-      { id: 'ef', name: '졸업 시험', boss: true, parts: [{ t: 'kanji', grades: [1, 2, 3, 4, 5, 6], n: 4 }, { t: 'verb', level: 'elem', n: 3 }, { t: 'grammar', levels: ['N5', 'N4'], n: 3 }] },
+      { id: 'ef', name: '졸업 시험', boss: true, parts: [{ t: 'kanji', grades: [1, 2, 3, 4, 5, 6], n: 8 }, { t: 'verb', level: 'elem', n: 6 }, { t: 'grammar', levels: ['N5', 'N4'], n: 6 }] },
     ] },
   { id: 'mid', name: '중학교', mark: '中', color: 'sky', reward: '졸업장 · 고등 한자 · 고등 동사 · N2 문법',
     stages: [
       { id: 'm1', name: '1학년', parts: [{ t: 'kanji', grades: [7], n: 4 }, { t: 'verb', level: 'mid', n: 3 }, { t: 'grammar', levels: ['N4'], n: 3 }] },
       { id: 'm2', name: '2학년', parts: [{ t: 'kanji', grades: [8], n: 4 }, { t: 'verb', level: 'mid', n: 3 }, { t: 'grammar', levels: ['N4', 'N3'], n: 3 }] },
       { id: 'm3', name: '3학년', parts: [{ t: 'kanji', grades: [9], n: 4 }, { t: 'verb', level: 'mid', n: 3 }, { t: 'grammar', levels: ['N3'], n: 3 }] },
-      { id: 'mf', name: '졸업 시험', boss: true, parts: [{ t: 'kanji', grades: [7, 8, 9], n: 4 }, { t: 'verb', level: 'mid', n: 3 }, { t: 'grammar', levels: ['N4', 'N3'], n: 3 }] },
+      { id: 'mf', name: '졸업 시험', boss: true, parts: [{ t: 'kanji', grades: [7, 8, 9], n: 8 }, { t: 'verb', level: 'mid', n: 6 }, { t: 'grammar', levels: ['N4', 'N3'], n: 6 }] },
     ] },
   { id: 'high', name: '고등학교', mark: '高', color: 'leaf', reward: '졸업장 · JLPT 마스터',
     stages: [
@@ -91,11 +91,13 @@ const SCHOOLS = [
       { id: 'h1', name: '1학년', parts: [{ t: 'hkanji', sets: ['jukuji'], n: 4 }, { t: 'verb', level: 'high', n: 3 }, { t: 'grammar', levels: ['N3'], n: 3 }] },
       { id: 'h2', name: '2학년', parts: [{ t: 'hkanji', sets: ['yoji'], n: 4 }, { t: 'verb', level: 'high', n: 3 }, { t: 'grammar', levels: ['N2'], n: 3 }] },
       { id: 'h3', name: '3학년', parts: [{ t: 'hkanji', sets: ['nandoku'], n: 4 }, { t: 'verb', level: 'high', n: 3 }, { t: 'grammar', levels: ['N2', 'N1'], n: 3 }] },
-      { id: 'hf', name: '졸업 시험', boss: true, parts: [{ t: 'hkanji', sets: ['jukuji', 'yoji', 'nandoku'], n: 4 }, { t: 'verb', level: 'high', n: 3 }, { t: 'grammar', levels: ['N2', 'N1'], n: 3 }] },
+      { id: 'hf', name: '졸업 시험', boss: true, parts: [{ t: 'hkanji', sets: ['jukuji', 'yoji', 'nandoku'], n: 8 }, { t: 'verb', level: 'high', n: 6 }, { t: 'grammar', levels: ['N2', 'N1'], n: 6 }] },
     ] },
 ]
 const STAGES = SCHOOLS.flatMap(s => s.stages.map(st => ({ ...st, school: s.id })))
-const PASS = 8   // 10문제 중 8개 이상이면 통과
+const PASS = 8   // 10문제 중 8개 이상이면 통과 (졸업 시험 20문제는 16개)
+function stageSize(st) { return st.parts.reduce((n, p) => n + p.n, 0) }
+function passNeed(st) { return Math.ceil(stageSize(st) * PASS / 10) }
 
 // 한자 학년 이름: 1~6 = 초등, 7~9 = 중1~중3 (중학 한자는 자주 쓰는 순으로 세 묶음)
 // 10~12 = 고1~고3 (특수 읽기 · 사자숙어 · 틀리기 쉬운 읽기 단어 목록)
@@ -423,7 +425,7 @@ function makeTalkQuestion(key) {
   let mix = shuffle(parts.map((_, i) => i))
   if (mix.every((v, i) => v === i)) mix = [...mix.slice(1), mix[0]]
   return { key, mode: 'talk', review, right, wrong,
-    head: `<div class="gq ko">${l.ko}</div>`, prompt: `순서대로 놓아 말해 봐요 <span class="dim">· ${l.when}</span>${tag}`,
+    head: `<div class="gq ko">${l.ko}</div>`, prompt: `순서대로 놓아 문장을 완성해요 <span class="dim">· ${l.when}</span>${tag}`,
     order: { parts: parts.map(furi), mix }, choices: [{ html: '', ok: true }, { html: '', ok: false }] }
 }
 function buildTalkQuiz(sceneId, wrongKeys) {
@@ -501,7 +503,7 @@ function buildMock(level) {
   const grades = MOCK_KANJI[level]
   const kk = grades.flatMap(g => g >= 10 ? highKanjiKeys([HK_GRADE[g]]).filter(k => k.endsWith(':r'))
     : kanjiPool(g).flatMap(c => readIndexes(c, g).map(i => `r:${c}:${i}`)))
-  const gk = GRAMMAR.filter(g => g.level === level).flatMap(grammarKeys).filter(k => /^g[fjob]:/.test(k))
+  const gk = GRAMMAR.filter(g => g.level === level).flatMap(grammarKeys).filter(k => /^g[fjo]:/.test(k))
   const tk = talkKeys('all').filter(k => /^t[wm]:/.test(k))
   const qs = [
     ...shuffle(kk).slice(0, 40).map(questionFromKey).filter(Boolean).slice(0, 10).map(q => tag(q, '문자')),

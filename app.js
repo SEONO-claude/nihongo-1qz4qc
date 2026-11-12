@@ -1,6 +1,6 @@
 // ───── 진도 저장 (localStorage) ─────
 const STORE_KEY = 'jp-study-progress'
-const EMPTY = { seen: {}, seenKanji: [], learnedForms: [], wrong: [], learnedKanji: [], wrongKanji: [], lastStudy: '', studyDays: [], today: { date: '', cards: 0, quizzes: 0, xp: 0 }, xp: 0, sound: true, music: true, savedGrammar: [], seenHigh: [], seenGrammar: [], learnedGrammar: [], wrongGrammar: [], stages: {}, graduated: [], badges: [], bestCombo: 0, musicVol: 1, sfxVol: 1, buddy: 'mike', track: 'all', talkSeen: [], learnedTalk: [], wrongTalk: [], talkStamps: {}, learnedOno: [], wrongOno: [], review: {}, master: {}, chests: 0, mock: {}, autoSpeak: false }
+const EMPTY = { seen: {}, seenKanji: [], learnedForms: [], wrong: [], learnedKanji: [], wrongKanji: [], lastStudy: '', studyDays: [], today: { date: '', cards: 0, quizzes: 0, xp: 0 }, xp: 0, sound: true, music: false, savedGrammar: [], seenHigh: [], seenGrammar: [], learnedGrammar: [], wrongGrammar: [], stages: {}, graduated: [], badges: [], bestCombo: 0, musicVol: 1, sfxVol: 1, buddy: 'mike', track: 'all', talkSeen: [], learnedTalk: [], wrongTalk: [], talkStamps: {}, learnedOno: [], wrongOno: [], review: {}, master: {}, chests: 0, mock: {}, autoSpeak: false, placed: false, openedOn: '' }
 
 function loadProgress() {
   try { return { ...EMPTY, ...JSON.parse(localStorage.getItem(STORE_KEY) || '{}') } }
@@ -10,12 +10,15 @@ function todayStr(offset = 0) {
   const d = new Date(); d.setDate(d.getDate() + offset)
   return d.toLocaleDateString('sv-SE')   // 내 기기 날짜, "2026-11-12" 모양
 }
-function saveProgress() {
+// 오늘 공부 도장: 카드를 보거나 문제를 풀었을 때만
+function markStudy() {
   progress.lastStudy = todayStr()
   if (!progress.studyDays.includes(progress.lastStudy)) {
     progress.studyDays = [...progress.studyDays, progress.lastStudy].slice(-90)
-    state.stampedNow = true   // 오늘 도장이 방금 찍힘 → 홈에서 "쾅" 하고 보여 준다
+    state.stampedNow = true
   }
+}
+function saveProgress() {
   try { localStorage.setItem(STORE_KEY, JSON.stringify(progress)) } catch { /* 저장이 막힌 브라우저 */ }
 }
 const progress = loadProgress()
@@ -323,6 +326,8 @@ function newQuiz() {
   const list = state.quizMode === 'stage' ? buildStageQuiz(STAGES.find(s => s.id === state.stage), wrong)
     : state.quizMode === 'kanji' ? buildKanjiQuiz(state.quizGrade, progress.wrongKanji)
     : state.quizMode === 'review' ? dueKeys().slice(0, 10).map(questionFromKey).filter(Boolean)
+    : state.quizMode === 'fix' ? buildFixQuiz()
+    : state.quizMode === 'place' ? buildPlacement()
     : state.quizMode === 'mock' ? buildMock(state.mockLevel)
     : state.quizMode === 'ono' ? buildOnoQuiz(state.onoQuiz || 'all', progress.wrongOno)
     : state.quizMode === 'talk' ? buildTalkQuiz(state.talkQuiz || 'all', progress.wrongTalk)
@@ -392,20 +397,45 @@ function hanamaruSVG() {
     <path class="spiral" d="${spiral}" pathLength="1"/><path class="ring" d="${ring}" pathLength="1"/></svg>`
 }
 
-function go(view) {
+// 퀴즈를 풀고 있는 중인지 (나갈 때 물어본다)
+function quizBusy() {
+  const qz = state.quiz
+  return state.view === 'quiz' && qz && qz.list.length && qz.i > 0 && qz.i < qz.list.length && (SPECIAL.includes(state.quizMode) || state.quizTab === 'free')
+}
+const SPECIAL = ['stage', 'review', 'mock', 'fix', 'place']
+function go(view, fromHistory) {
+  if (view !== state.view && quizBusy() && !confirm('퀴즈를 그만둘까요?\n지금까지 푼 문제는 기록돼요')) { if (fromHistory) history.pushState({ v: state.view }, ''); return }
+  if (!fromHistory && view !== state.view) history.pushState({ v: view }, '')
   state.view = view
   state.kanji = null
   if (view === 'quiz') {
     // 메뉴로 퀴즈에 오면 퀘스트 지도부터 (스테이지 중이었으면 그만둠)
-    if (['stage', 'review', 'mock'].includes(state.quizMode)) { state.quizMode = 'verb'; state.quizTab = 'quest' }
+    if (SPECIAL.includes(state.quizMode)) { state.quizMode = 'verb'; state.quizTab = 'quest' }
     newQuiz()
   }
+  if (view === 'talk' && !fromHistory) state.talkScene = null
   render()
   window.scrollTo(0, 0)
 }
+// 휴대폰 뒤로 가기: 열린 창부터 닫고, 그다음 이전 화면으로
+try { history.replaceState({ v: 'home' }, '') } catch { /* 무시 */ }
+window.addEventListener('popstate', e => {
+  const overlay = document.querySelector('.rcover, #soundpanel')
+  if (overlay) { overlay.remove(); history.pushState({ v: state.view }, ''); return }
+  const s = e.state || { v: 'home' }
+  if (state.view === 'talk' && state.talkScene && s.v === 'talk' && !s.scene) { state.talkScene = null; render(); return }
+  if (s.v === 'quiz' && state.view === 'quiz' && SPECIAL.includes(state.quizMode)) {
+    if (quizBusy() && !confirm('퀴즈를 그만둘까요?\n지금까지 푼 문제는 기록돼요')) { history.pushState({ v: 'quiz' }, ''); return }
+    state.quizMode = 'verb'; state.quizTab = 'quest'; render(); return
+  }
+  go(s.v, true)
+  if (s.v === 'talk' && s.scene) { state.talkScene = s.scene; render() }
+})
 
 function render() {
-  document.querySelectorAll('.top nav button').forEach(b => b.classList.toggle('on', b.dataset.go === (state.view === 'conj' ? 'cards' : state.view)))
+  const navV = ['conj', 'kanji'].includes(state.view) ? 'cards' : state.view
+  document.querySelectorAll('.tabbar button').forEach(b => b.classList.toggle('on', b.dataset.go === navV))
+  document.body.classList.toggle('quizzing', state.view === 'quiz' && !!state.quiz && state.quiz.i < state.quiz.list.length && (SPECIAL.includes(state.quizMode) || state.quizTab === 'free') && !(state.quizMode === 'mock' && state.mockIntro))
   app.classList.toggle('wide', state.view === 'conj' && state.conjMode === 'all')
   app.classList.toggle('homewide', state.view === 'home')
   app.dataset.view = state.view
@@ -446,18 +476,13 @@ function bar(label, done, total) {
 
 // ───── 홈 (진도) ─────
 function homeView() {
-  const formTotal = WORDS.length * FORMS.length
-  const g1 = progress.seenKanji.filter(c => KANJI[c] && KANJI[c].grade === 1).length
-  const allK = progress.seenKanji.filter(c => KANJI[c]).length
-  const totalK = Object.keys(KANJI).length
   const date = new Date().toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })
-  const wrong = progress.wrong.length + progress.wrongKanji.length + progress.wrongGrammar.length
-  const kanjiQ = Object.values(KANJI).reduce((n, k) => n + 1 + k.examples.length, 0) + highKanjiKeys(Object.keys(HK_SETS)).length
   const weekday = new Date().toLocaleDateString('ko-KR', { weekday: 'long' })
-  const t = todayStats(), s = streak(), studiedToday = progress.studyDays.includes(todayStr())
+  const t = todayStats(), s = streak()
   const nextSt = STAGES[currentStageIndex()]
-  const lead = `다음 퀘스트 · ${schoolOf(nextSt.school).name} ${nextSt.name}` + (s >= 2 ? ` · ${s}일 연속` : '')
   const allClear = STAGES.every(x => stageCleared(x.id))
+  const lead = allClear ? `졸업 뒤 목표 · 마스터 별 ★ ${masterCount('g:')} / ${GRAMMAR.length}`
+    : `다음 퀘스트 · ${schoolOf(nextSt.school).name} ${nextSt.name}` + (s >= 2 ? ` · ${s}일 연속` : '')
 
   // 다음 목표: 지금 스테이지를 통과하면 무엇이 열리는지
   const after = STAGES[currentStageIndex() + 1]
@@ -465,53 +490,21 @@ function homeView() {
   const prizes = after && !allClear ? [{ kind: 'stage', label: `퀘스트 ${schoolOf(after.school).name} ${after.name}` }, ...(prizeCat ? [{ kind: 'cat', label: `새 친구 고양이` }] : []), ...unlocksAt(after.id)] : []
   const nextGoal = allClear ? '' : `
   <div class="panel nextgoal">
-    <div class="eyebrow">다음 목표 <span class="num">· Lv.${playerLevel() + 1}까지</span></div>
+    <div class="eyebrow">다음 목표 <span class="num">· Lv.${playerLevel() + 1}까지 · 퀘스트 ${clearedCount()} / ${STAGES.length}</span></div>
     <div class="ngmain"><span class="smark">${schoolIcon(nextSt.school)}</span>
-      <div><b>${schoolOf(nextSt.school).name} ${nextSt.name} 통과하기</b><small>10문제 중 ${PASS}개 이상 맞히면 통과</small></div>
+      <div><b>${schoolOf(nextSt.school).name} ${nextSt.name} 통과하기</b><small>${stageSize(nextSt)}문제 중 ${passNeed(nextSt)}개 이상 맞히면 통과</small></div>
       <button class="btn pri" data-act="questContinue">도전</button></div>
     ${prizes.length ? `<div class="ngprize"><span>통과하면 열려요</span>${prizes.map(u => `<span class="ktag ${u.kind}">${u.label}</span>`).join('')}</div>` : ''}
-    <div class="row prog"><div class="label">퀘스트 진행<span class="num">${clearedCount()} / ${STAGES.length}</span></div>
-      <div class="bar"><i style="width:${clearedCount() / STAGES.length * 100}%"></i></div></div>
   </div>`
 
-  // 오늘의 한자
-  const dk = dailyKanji(), k = KANJI[dk], [ew, er, em] = k.examples[0]
-  const todayKanji = `
-  <button class="panel daily" data-act="todayKanji" aria-label="오늘의 한자 ${dk} 자세히">
-    <span class="eyebrow">오늘의 한자 <span class="num">· ${gradeLong(k.grade)}</span></span>
-    <span class="daily-body">
-      <span class="masu xl" lang="ja">${dk}</span>
-      <span class="daily-text">
-        <span class="kname">${k.meaning}</span>
-        <span class="dim" lang="ja">${readingsText(k)}</span>
-        <span class="daily-ex"><span lang="ja"><ruby>${ew}<rt>${er}</rt></ruby></span> ${em}</span>
-      </span>
-    </span>
-  </button>`
-
-  // 공부 도장 카드: 최근 14일
-  const days = new Set(progress.studyDays)
-  const cells = Array.from({ length: 14 }, (_, n) => {
-    const day = todayStr(n - 13), d = new Date(day)
-    const stamped = days.has(day), isToday = n === 13
-    return `<span class="stampcell${isToday ? ' today' : ''}" title="${day}">
-      <span class="stampday num">${d.getDate()}</span>
-      ${stamped ? `<span class="stamp${isToday && state.stampedNow ? ' new' : ''}" lang="ja" style="--r:${((d.getDate() * 37) % 21) - 10}deg">済</span>` : ''}
-    </span>`
-  }).join('')
-  const stampCard = `
-  <div class="panel stampcard">
-    <div class="eyebrow">공부 도장 <span class="num">· 연속 ${s}일</span></div>
-    <div class="stampgrid">${cells}</div>
-    <div class="hint">카드를 보거나 퀴즈를 풀면 그날 도장이 찍혀요</div>
-  </div>`
-
-  // 오늘의 목표
   const check = '<svg class="check" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" pathLength="1"/></svg>'
   const goal = (label, n, max, c) => `<div class="goal${n >= max ? ' done' : ''}" style="--c:${c}">
     <span>${label}${n >= max ? check : ''}</span><span class="num">${Math.min(n, max)} / ${max}</span>
     <div class="bar"><i style="width:${Math.min(n, max) / max * 100}%"></i></div></div>`
   const hello = t.xp > 0 ? `오늘 ${t.xp} XP 모았어요` : s >= 2 ? `${s}일 연속이에요` : '같이 공부해요'
+  const main = allClear ? '<button class="btn pri" data-act="startFix">오늘의 교정 10문제</button>' : '<button class="btn pri" data-act="questContinue">퀘스트 계속</button>'
+  const second = !progress.placed && clearedCount() < 3 ? '<button class="btn" data-act="startPlace">실력 진단</button>'
+    : allClear ? '<button class="btn" data-go="quiz">퀘스트 지도</button>' : '<button class="btn" data-act="startFix">교정 10문제</button>'
 
   return `
   <section class="hero">
@@ -522,37 +515,105 @@ function homeView() {
       <span class="lvchip"><b class="num">Lv.${playerLevel()}</b>${rankName()}</span>
       <h1>오늘의 공부</h1>
       <p>${lead}</p>
-      <div class="hero-actions">
-        <button class="btn pri" data-act="questContinue">퀘스트 계속</button>
-        <button class="btn" data-go="cards">단어 카드</button>
-      </div>
+      ${!progress.placed && clearedCount() < 3 ? '<p class="placehint">이미 일본어를 조금 안다면, 실력 진단으로 시작 학년을 건너뛰세요</p>' : ''}
+      <div class="hero-actions">${main}${second}</div>
     </div>
   </section>
-  ${nextGoal}
-  <div class="homegrid">${todayKanji}${stampCard}</div>
   ${correctionCardHTML()}
   ${missionsHTML(t, goal)}
+  ${nextGoal}
   <div class="homegrid">${reviewCardHTML()}${mockCardHTML()}</div>
   <div class="panel">
-    <div class="hd">지금까지</div>
+    <div class="hd">나의 기록</div>
     ${bar('마스터한 문법 ★', masterCount('g:'), GRAMMAR.length)}
     ${bar('마스터한 한자 ★', masterCount('k:'), Object.keys(KANJI).length)}
-    ${bar('의성어 도감', seenCount('ono'), ONO_CARDS.length || 150)}
     ${bar('회화 장면 도장', Object.keys(progress.talkStamps).length, typeof TALK === 'undefined' ? 20 : TALK.length)}
     ${bar('고양이 친구', CATS.filter(catOpen).length, CATS.length)}
-    ${bar('딴 배지', progress.badges.length, BADGES.length)}
-    ${bar('한자 전체', allK, totalK)}
-    ${bar('중학 한자', progress.seenKanji.filter(c => KANJI[c] && KANJI[c].grade >= 7).length, Object.values(KANJI).filter(k => k.grade >= 7).length || 1110)}
+    <button class="linkbtn" data-go="me">전체 기록 보기</button>
+  </div>
+  ${offlineReady ? '<p class="sub offline">인터넷 없이도 열 수 있어요</p>' : ''}`
+}
+
+// ───── 내 정보 · 설정 ─────
+function meView() {
+  const s = streak()
+  const allK = progress.seenKanji.filter(c => KANJI[c]).length
+  const kanjiQ = Object.values(KANJI).reduce((n, k) => n + 1 + k.examples.length, 0) + highKanjiKeys(Object.keys(HK_SETS)).length
+  const wrong = progress.wrong.length + progress.wrongKanji.length + progress.wrongGrammar.length
+  const days = new Set(progress.studyDays)
+  const cells = Array.from({ length: 14 }, (_, n) => {
+    const day = todayStr(n - 13), d = new Date(day)
+    return `<span class="stampcell${n === 13 ? ' today' : ''}" title="${day}"><span class="stampday num">${d.getDate()}</span>${days.has(day) ? `<span class="stamp" lang="ja" style="--r:${((d.getDate() * 37) % 21) - 10}deg">済</span>` : ''}</span>`
+  }).join('')
+  const b = buddy()
+  return `
+  <div class="mehead">
+    <img src="${catImage(b)}" alt="${b.name}" width="400" height="400">
+    <div><span class="lvchip"><b class="num">Lv.${playerLevel()}</b>${rankName()}</span><h1>내 정보</h1>
+      <p>별 <b class="num">${totalStars()}</b> · 총 <b class="num">${progress.xp || 0}</b> XP · 연속 <b class="num">${s}</b>일 · 단짝 ${b.name}</p></div>
+  </div>
+  <div class="panel stampcard"><div class="eyebrow">공부 도장 <span class="num">· 최근 14일</span></div><div class="stampgrid">${cells}</div>
+    <div class="hint">카드를 보거나 문제를 풀면 그날 도장이 찍혀요</div></div>
+  <div class="panel">
+    <div class="hd">전체 기록</div>
+    ${bar('마스터한 문법 ★', masterCount('g:'), GRAMMAR.length)}
+    ${bar('마스터한 한자 ★', masterCount('k:'), Object.keys(KANJI).length)}
+    ${bar('본 한자', allK, Object.keys(KANJI).length)}
+    ${bar('본 JLPT 문법', progress.seenGrammar.filter(id => GRAMMAR.some(g => g.id === id)).length, GRAMMAR.length)}
     ${bar('동사 카드', seenCount('verb'), WORDS.length)}
     ${bar('형용사 카드', seenCount('adj'), ADJECTIVES.length)}
     ${bar('명사 카드', seenCount('noun'), NOUNS.length)}
-    ${bar('맞힌 동사 형태', progress.learnedForms.length, formTotal)}
+    ${bar('의성어 도감', seenCount('ono'), ONO_CARDS.length || 150)}
+    ${bar('회화 장면 도장', Object.keys(progress.talkStamps).length, typeof TALK === 'undefined' ? 20 : TALK.length)}
     ${bar('맞힌 한자 문제', progress.learnedKanji.length, kanjiQ)}
-    ${bar('본 JLPT 문법', progress.seenGrammar.filter(id => GRAMMAR.some(g => g.id === id)).length, GRAMMAR.length)}
     ${bar('맞힌 문법 문제', progress.learnedGrammar.length, GRAMMAR.reduce((n, g) => n + grammarKeys(g).length, 0))}
+    ${bar('고양이 친구', CATS.filter(catOpen).length, CATS.length)}
+    ${bar('배지', progress.badges.length, BADGES.length)}
     <div class="row"><div class="label">다시 볼 문제<span class="num${wrong ? ' key' : ''}">${wrong}개</span></div></div>
   </div>
-  ${offlineReady ? '<p class="sub offline">인터넷 없이도 열 수 있어요</p>' : ''}`
+  <div class="panel melist">
+    <div class="hd">설정</div>
+    <button class="merow" data-act="meSound"><b>소리</b><span>배경음악 · 효과음 음량, 곡 고르기</span></button>
+    <button class="merow" data-go="quiz"><b>고양이 친구 · 배지</b><span>퀘스트 지도 아래에서 볼 수 있어요</span></button>
+  </div>
+  <div class="panel melist">
+    <div class="hd">기록 보관</div>
+    <p class="menote">공부 기록은 이 휴대폰 안에만 저장돼요. 휴대폰을 바꾸거나 앱을 지우기 전에 내보내 두세요.</p>
+    <button class="merow" data-act="meExport"><b>기록 내보내기</b><span>파일로 저장하거나 보내기</span></button>
+    <button class="merow" data-act="meImport"><b>기록 가져오기</b><span>내보낸 파일로 되살리기</span></button>
+    <input type="file" id="importfile" accept=".json,application/json" hidden>
+    <button class="merow danger" data-act="meReset"><b>기록 초기화</b><span>처음부터 다시 시작</span></button>
+  </div>
+  <div class="panel melist">
+    <div class="hd">앱 정보</div>
+    <p class="menote"><b>개인정보</b> · 이 앱은 회원 가입이 없고, 공부 기록을 서버로 보내지 않아요. 모든 기록은 이 기기 안에만 있어요.</p>
+    <p class="menote"><b>자료 출처</b> · 한자 읽기와 학년 자료는 KANJIDIC2(EDRDG, CC BY-SA 4.0)를 바탕으로 했어요. 예문과 설명, 그림은 이 앱을 위해 새로 만들었어요.</p>
+    <p class="menote"><b>버전</b> · 1.0.0</p>
+  </div>`
+}
+// 기록 내보내기·가져오기
+async function exportProgress() {
+  const text = JSON.stringify({ app: 'nihongo-study', v: 1, at: new Date().toISOString(), progress }, null, 0)
+  const name = `nihongo-record-${todayStr()}.json`
+  try {
+    const file = new File([text], name, { type: 'application/json' })
+    if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], title: '일본어 공부 기록' }); return }
+  } catch { /* 공유 취소 → 내려받기 */ }
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type: 'application/json' })); a.download = name; a.click()
+}
+document.addEventListener('change', async e => {
+  if (e.target.id !== 'importfile' || !e.target.files[0]) return
+  try {
+    const data = JSON.parse(await e.target.files[0].text())
+    if (!data || data.app !== 'nihongo-study' || !data.progress) throw new Error('bad')
+    if (!confirm('이 파일의 기록으로 바꿀까요?\n지금 기록은 덮어써져요')) return
+    localStorage.setItem(STORE_KEY, JSON.stringify(data.progress)); location.reload()
+  } catch { alert('이 앱에서 내보낸 기록 파일이 아니에요') }
+})
+
+// 단어 카드 ↔ 한자 표
+function wordSeg(cur) {
+  return `<div class="seg"><button class="${cur === 'cards' ? 'on' : ''}" data-go="cards">단어 카드</button><button class="${cur === 'kanji' ? 'on' : ''}" data-go="kanji">한자 표</button></div>`
 }
 
 // ───── 학년별 한자 ─────
@@ -586,7 +647,7 @@ function highView() {
       ${kanjiInfo(open[0])}</div>` : ''
   const tabs = gradeTabs()
   const NOTE = { 10: '단어 전체에 붙는 특수한 읽기예요. 한자 하나하나의 음으로는 읽을 수 없어요', 11: '네 글자로 된 관용 표현이에요', 12: '일본 사람도 자주 틀리는 읽기예요' }
-  return `
+  return `${wordSeg('kanji')}
   <section class="banner">
     <img src="${IMAGES.kanji}" alt="벚꽃 핀 학교 가는 길, 돌담 위의 빨간 란도셀" width="1680" height="720">
     <div class="banner-text"><h1>고등 한자</h1><p><span class="num">${progress.seenHigh.length} / ${[10, 11, 12].reduce((n, g) => n + highList(g).length, 0)}</span>개를 봤어요</p></div>
@@ -599,8 +660,9 @@ function highView() {
 }
 
 function kanjiBanner(title) {
+  const seg = wordSeg('kanji')
   const openK = kanjiGrades().filter(g => g <= 9 && isOpen('kanji', g)).reduce((n, g) => n + kanjiList(g).length, 0)
-  return `<section class="banner">
+  return `${seg}<section class="banner">
     <img src="${IMAGES.kanji}" alt="벚꽃 핀 학교 가는 길, 돌담 위의 빨간 란도셀" width="1680" height="720">
     <div class="banner-text"><h1>${title}</h1><p>열린 한자 <span class="num">${openK} / ${Object.keys(KANJI).length}</span>자</p></div>
   </section>`
@@ -619,7 +681,7 @@ function kanjiView() {
     return `<button class="${cls}" data-kanji="${c}" lang="ja" title="${KANJI[c].meaning}">${c}</button>`
   }).join('')
   const seenAll = progress.seenKanji.filter(c => KANJI[c]).length
-  return `
+  return `${wordSeg('kanji')}
   <section class="banner">
     <img src="${IMAGES.kanji}" alt="벚꽃 핀 학교 가는 길, 돌담 위의 빨간 란도셀" width="1680" height="720">
     <div class="banner-text"><h1>${state.grade >= 7 ? "중학 상용 한자" : "초등 필수 한자"}</h1><p><span class="num">${seenAll} / ${Object.keys(KANJI).length}</span>자를 봤어요</p></div>
@@ -745,6 +807,7 @@ function cardsView() {
   const hasKanji = w.ruby.some(p => p[1] && [...p[0]].some(ch => KANJI[ch]))
   const hint = [w.note ? w.note.replace(/\.$/, '') : '', hasKanji ? '한자를 누르면 음독과 훈독이 나와요' : ''].filter(Boolean).join(' · ')
   return `
+  ${wordSeg('cards')}
   <div class="tabs cardtabs">${tabs}</div>
   ${type === 'verb' ? '<button class="linkbtn" data-go="conj">동사 변화표 전체 보기</button>' : ''}
   <div class="picker">
@@ -776,6 +839,7 @@ function markSeen() {
   if (!w) return
   state.cardIdx[state.cardType] = cardIndex()
   const key = seenKey(state.cardType, w.id)
+  markStudy()
   progress.seen[key] = (progress.seen[key] || 0) + 1
   if (state.cardType === 'high' && !progress.seenHigh.includes(w.kanji)) progress.seenHigh.push(w.kanji)   // 한자 화면의 "본 단어"와 함께 센다
   todayStats().cards++
@@ -924,19 +988,89 @@ const CAT_LINES = {
   sabi: ['저, 저기… 같이 공부해요', '조용히 응원하고 있어요', '오늘도 와 줘서 고마워요'],
   mofu: ['폭신하게 시작해 봐요', '천천히 와도 기다릴게요', '오늘 배운 거 꼭 안아 둘게요'],
 }
-// 오늘의 교정: 날마다 헷갈리는 문법 짝 하나를 단짝이 짚어 준다
-function correctionCardHTML() {
-  const open = GRAMMAR.filter(g => isOpen('grammar', g.level) && g.diff && (g.similar || []).some(id => { const x = GRAMMAR.find(y => y.id === id); return x && isOpen('grammar', x.level) }))
-  if (!open.length) return ''
+// 오늘의 교정: 날마다 헷갈리는 문법 짝 하나를 단짝이 문제로 내 준다 (홈에서 바로 풀기)
+function todayCorrection() {
+  const openG = id => { const x = GRAMMAR.find(y => y.id === id); return x && isOpen('grammar', x.level) ? x : null }
+  // 빈칸 바로 앞 글자가 같은 예문끼리만 짝을 지어, 모양만 보고 답이 드러나지 않게 한다
+  const before = jp => { const i = jp.indexOf('［'); return i > 0 ? jp[i - 1] : '' }
+  const pool = []
+  for (const g of GRAMMAR) {
+    if (!isOpen('grammar', g.level) || !g.diff) continue
+    const sims = (g.similar || []).map(openG).filter(Boolean)
+    g.examples.forEach((e, ei) => {
+      if (!e.jp.includes('［')) return
+      const ans = blankOf(e), opts = [ans]
+      for (const x of sims) for (const y of x.examples) {
+        const b = blankOf(y)
+        if (b && before(y.jp) === before(e.jp) && !opts.some(o => plainJp(o) === plainJp(b))) { opts.push(b); break }
+      }
+      if (opts.length >= 2) pool.push({ g, e, ei, ans, opts, sims })
+    })
+  }
+  if (!pool.length) return null
   const d = todayStr(), seed = [...d].reduce((n, ch) => (n * 37 + ch.charCodeAt(0)) % 100019, 11)
-  const g = open[seed % open.length]
-  const sims = g.similar.map(id => GRAMMAR.find(y => y.id === id)).filter(x => x && isOpen('grammar', x.level)).slice(0, 2)
-  const b = buddy()
+  const c = pool[seed % pool.length], opts = c.opts.slice(0, 3)
+  if (seed % 2) opts.reverse()
+  return { ...c, opts, key: `gf:${c.g.id}:${c.ei}` }
+}
+function correctionCardHTML() {
+  const c = todayCorrection()
+  if (!c) return ''
+  const b = buddy(), done = state.fixDone
+  const sent = furi(c.e.jp.replace(/［[^［］]*］/, '<span class="blank">（　　）</span>'))
+  const btns = c.opts.map((o, i) => {
+    const cls = done ? (o === c.ans ? ' ok' : i === done.i ? ' miss' : '') : ''
+    return `<button class="choice fixopt${cls}" data-act="fixPick" data-i="${i}" lang="ja" ${done ? 'disabled' : ''}>${furi(o)}</button>`
+  }).join('')
   return `<div class="panel fixcard">
-    <div class="fixhead">${mascot('think', 'fixcat')}<div><div class="eyebrow">${b.name}의 오늘의 교정</div><b>이 둘, 헷갈리지 않나요</b></div></div>
-    <div class="fixpair"><button class="gsimbtn" data-act="grammarJump" data-id="${g.id}"><span lang="ja">${furi(g.pattern)}</span><small>${g.level} · ${g.meaning}</small></button>
-      ${sims.map(x => `<span class="fixvs">vs</span><button class="gsimbtn" data-act="grammarJump" data-id="${x.id}"><span lang="ja">${furi(x.pattern)}</span><small>${x.level} · ${x.meaning}</small></button>`).join('')}</div>
-    <p class="fixdiff">${g.diff}</p></div>`
+    <div class="fixhead">${mascot(done ? (done.ok ? 'cheer' : 'sad') : 'think', 'fixcat')}<div><div class="eyebrow">${b.name}의 오늘의 교정</div><b>${done ? (done.ok ? '맞았어요, 이 짝은 안 헷갈리네요' : '헷갈렸죠, 내일 다시 나와요') : '빈칸에 맞는 것은'}</b></div></div>
+    <div class="gsent fixsent" lang="ja">${sent}</div><p class="fixko">${c.e.ko}</p>
+    <div class="fixopts">${btns}</div>
+    ${done ? `<p class="fixdiff">${c.g.diff}</p><div class="actions"><button class="btn pri" data-act="startFix">교정 10문제 더 풀기</button></div>` : ''}
+  </div>`
+}
+// 교정 10문제: 헷갈리는 짝이 오답으로 나오는 빈칸 문제만, 틀렸던 것 먼저
+function buildFixQuiz() {
+  const keys = GRAMMAR.filter(g => isOpen('grammar', g.level) && (g.similar || []).length).flatMap(g => g.examples.map((x, i) => x.jp.includes('［') ? `gf:${g.id}:${i}` : null).filter(Boolean))
+  return pickKeys(progress.wrongGrammar, keys).map(k => { const q = makeGrammarQuestion(k); q.mode = 'grammar'; return q })
+}
+// 실력 진단(월반 시험): 단계마다 한자 1 + 문법 1, 연속으로 둘 다 맞힌 단계까지 건너뛴다
+const PLACE_TIERS = [
+  { kanji: 2, lv: 'N5', to: 'e3', label: '초등학교 3학년' },
+  { kanji: 4, lv: 'N4', to: 'e5', label: '초등학교 5학년' },
+  { kanji: 6, lv: 'N4', to: 'm1', label: '중학교 1학년' },
+  { kanji: 8, lv: 'N3', to: 'm3', label: '중학교 3학년' },
+  { kanji: 9, lv: 'N3', to: 'h1', label: '고등학교 1학년' },
+  { kanji: 11, lv: 'N2', to: 'h3', label: '고등학교 3학년' },
+]
+function buildPlacement() {
+  const out = []
+  PLACE_TIERS.forEach((t, ti) => {
+    const kk = t.kanji >= 10 ? highKanjiKeys([HK_GRADE[t.kanji]]).filter(k => k.endsWith(':r')) : kanjiPool(t.kanji).flatMap(c => readIndexes(c, t.kanji).map(i => `r:${c}:${i}`))
+    const gk = GRAMMAR.filter(g => g.level === t.lv).flatMap(g => g.examples.map((x, i) => x.jp.includes('［') ? `gf:${g.id}:${i}` : null).filter(Boolean))
+    for (const k of [shuffle(kk)[0], shuffle(gk)[0]]) { const q = k && questionFromKey(k); if (q) { q.tier = ti; out.push(q) } }
+  })
+  return out
+}
+function applyPlacement(qz) {
+  let reached = -1
+  for (let ti = 0; ti < PLACE_TIERS.length; ti++) {
+    const qs = qz.list.filter(q => q.tier === ti)
+    if (qs.length && qs.every(q => !qz.missed.includes(q))) reached = ti; else break
+  }
+  progress.placed = true
+  if (reached < 0) { saveProgress(); return { label: '초등학교 1학년', skipped: 0 } }
+  const t = PLACE_TIERS[reached], idx = stageIndex(t.to)
+  let skipped = 0
+  for (let i = 0; i < idx; i++) if (!stageCleared(STAGES[i].id)) { progress.stages[STAGES[i].id] = 1; skipped++ }
+  for (const sc of SCHOOLS) if (stageCleared(sc.stages[sc.stages.length - 1].id) && !progress.graduated.includes(sc.id)) progress.graduated.push(sc.id)
+  checkBadges(); saveProgress()
+  return { label: t.label, skipped }
+}
+function placeResultHTML(p) {
+  return `<div class="mockres pass"><div class="mockscore"><b>${p.label}</b></div>
+    <p>${p.skipped ? `${p.skipped}칸을 건너뛰고 여기서 시작해요 · 건너뛴 칸은 별 1개로 채워 두었어요` : '처음부터 차근차근 시작해요'}</p>
+    <div class="actions"><button class="btn pri" data-act="questContinue">여기서 시작</button></div></div>`
 }
 
 // ───── 성취감: 오늘의 미션 · 복습 · 모의고사 · 성적표 ─────
@@ -987,8 +1121,8 @@ const PASS_LINE = { N5: 80, N4: 90, N3: 95, N2: 90, N1: 100 }
 function mockCardHTML() {
   const btns = LEVELS.slice().reverse().map(l => { const open = isOpen('grammar', l), best = (progress.mock || {})[l]
     return `<button class="mockbtn${open ? '' : ' locked'}${best >= PASS_LINE[l] ? ' passed' : ''}" data-act="startMock" data-level="${l}" ${open ? '' : 'disabled'}>${open ? '' : LOCK}<b>${l}</b><small>${best != null ? best + '점' : open ? '도전' : '잠김'}</small></button>` }).join('')
-  return `<div class="panel challenge"><div class="eyebrow">JLPT 모의고사 <span class="num">· 30문제 · 180점 만점</span></div>
-    <div class="mockbtns">${btns}</div><p class="chnote">급수별 합격선을 넘으면 合 도장 · 문법 급수가 열려야 도전할 수 있어요</p></div>`
+  return `<div class="panel challenge"><div class="eyebrow">JLPT 실력 체크 <span class="num">· 문자·문법 30문제</span></div>
+    <div class="mockbtns">${btns}</div><p class="chnote">문자·문법만 점검해요(독해·청해 없음) · 합격선 수준이면 合 도장</p></div>`
 }
 // 모의고사 점수: 180점으로 환산, 합격선과 영역 최저점(3분의 1) 모두 넘으면 합격 예상
 function mockScore(qz) {
@@ -1000,7 +1134,8 @@ function mockScore(qz) {
 function mockResultHTML(m) {
   return `<div class="mockres${m.pass ? ' pass' : ''}">
     <div class="mockscore"><b class="num">${m.score}</b><span>/ 180</span>${m.pass ? '<span class="hanko passmark" lang="ja">合</span>' : ''}</div>
-    <p>${m.pass ? `합격 예상이에요 · ${state.mockLevel} 합격선 ${m.line}점` : `합격선 ${m.line}점까지 ${Math.max(0, m.line - m.score)}점 · 조금만 더`}</p>
+    <p>${m.pass ? `문자·문법은 ${state.mockLevel} 합격선 수준이에요 (${m.line}점)` : `합격선 ${m.line}점까지 ${Math.max(0, m.line - m.score)}점 · 조금만 더`}</p>
+    <p class="chnote">180점 만점으로 바꾼 점수예요 · 실제 시험의 독해·청해는 들어 있지 않아요</p>
     <div class="mocksecs">${m.secs.map(x => `<div><span>${x.s}</span><b class="num">${x.r} / ${x.n}</b><i style="width:${x.n ? x.r / x.n * 100 : 0}%"></i></div>`).join('')}</div></div>`
 }
 function masterCount(prefix) { return Object.entries(progress.master || {}).filter(([k, v]) => v === 3 && k.startsWith(prefix)).length }
@@ -1183,7 +1318,7 @@ function stageDoneView() {
     <div class="done${passed ? '' : ' fail'}">
       ${qz.right === total ? hanamaruSVG() : ''}
       ${mascot(qz.graduated ? 'party' : passed ? 'cheer' : 'sad')}
-      <p>${qz.graduated ? `${sc.name} 졸업을 축하해요` : passed ? `${st.name} 통과` : `${PASS}개 이상 맞히면 통과예요`}</p>
+      <p>${qz.graduated ? `${sc.name} 졸업을 축하해요` : passed ? `${st.name} 통과` : `${stageSize(st)}문제 중 ${passNeed(st)}개 이상 맞히면 통과예요`}</p>
       <div class="bigstars">${[1, 2, 3].map(k => `<i class="${k <= qz.stars ? 'on' : ''}" style="--d:${k * 220}ms">★</i>`).join('')}</div>
       <div class="stats">
         <div class="stat"><b class="num">${qz.right} / ${total}</b><small>맞힌 문제</small></div>
@@ -1204,19 +1339,20 @@ function stageDoneView() {
 
 // ───── 퀴즈 ─────
 function quizHeader() {
-  if (state.quizMode === 'review' || state.quizMode === 'mock') {
-    const rv = state.quizMode === 'review'
-    return `<div class="stagebar" style="--c:var(--${rv ? 'mint' : 'pink'});--ct:var(--${rv ? 'mint' : 'pink'}-t)">
+  if (['review', 'mock', 'fix', 'place'].includes(state.quizMode)) {
+    const H = { review: ['mint', '기억 강도', '오늘 복습', '틀렸던 문제 다시'], mock: ['pink', 'JLPT', `${state.mockLevel} 실력 체크`, '문자 · 문법 30문제'],
+      fix: ['sky', '헷갈리는 짝', '오늘의 교정', '빈칸 10문제'], place: ['sun', '월반 시험', '실력 진단', '12문제로 시작 학년 찾기'] }[state.quizMode]
+    return `<div class="stagebar" style="--c:var(--${H[0]});--ct:var(--${H[0]}-t)">
       <button class="btn icon-only" data-go="home" aria-label="홈으로">${icon('left')}</button>
-      <div class="stagename"><small>${rv ? '기억 강도' : 'JLPT'}</small><b>${rv ? '오늘 복습' : state.mockLevel + ' 모의고사'}</b></div>
-      <span class="stagegoal">${rv ? '틀렸던 문제 다시' : '문자 · 문법 · 표현'}</span></div>`
+      <div class="stagename"><small>${H[1]}</small><b>${H[2]}</b></div>
+      <span class="stagegoal">${H[3]}</span></div>`
   }
   if (state.quizMode === 'stage') {
     const st = STAGES.find(s => s.id === state.stage), sc = schoolOf(st.school)
     return `<div class="stagebar" style="--c:var(--${sc.color});--ct:var(--${sc.color}-t)">
       <button class="btn icon-only" data-act="toMap" aria-label="퀘스트 지도로">${icon('left')}</button>
       <div class="stagename"><small>${sc.name}</small><b>${st.name}</b></div>
-      <span class="stagegoal">${PASS}개 이상 통과</span></div>`
+      <span class="stagegoal">${stageSize(st)}문제 중 ${passNeed(st)}개 이상</span></div>`
   }
   const modes = [['verb', '동사'], ['kanji', '한자'], ['grammar', '문법'], ['talk', '회화'], ['ono', '의성어']]
     .map(([m, label]) => `<button class="${state.quizMode === m ? 'on' : ''}" data-act="quizMode" data-mode="${m}">${label}</button>`).join('')
@@ -1238,7 +1374,7 @@ function quizHeader() {
 
 // 퀴즈 메뉴: 스테이지를 푸는 중이거나 자유 연습이면 문제 화면, 아니면 퀘스트 지도
 function quizPage() {
-  return ['stage', 'review', 'mock'].includes(state.quizMode) || state.quizTab === 'free' ? quizView() : questView()
+  return SPECIAL.includes(state.quizMode) || state.quizTab === 'free' ? quizView() : questView()
 }
 
 // 위쪽 진행 막대 + 연속 정답
@@ -1251,6 +1387,10 @@ function quizTop(qz) {
 
 function quizView() {
   const qz = state.quiz
+  if (state.quizMode === 'mock' && state.mockIntro) return quizHeader() + `<div class="panel mockintro">
+    <div class="gempty">${mascot('think')}<p><b>${state.mockLevel} 실력 체크</b><br>문자 10 · 문법 15 · 표현 5, 모두 30문제 · 10분쯤 걸려요</p>
+    <ul><li>JLPT의 <b>문자·문법</b> 부분만 점검해요. 독해·청해는 들어 있지 않아요</li><li>문제마다 바로 정답을 알려 줘요</li><li>중간에 나가면 이번 점수는 남지 않아요</li></ul>
+    <button class="btn pri" data-act="mockGo">시작하기</button></div></div>`
   if (!qz.list.length && state.quizMode === 'review') return quizHeader() + `<div class="panel"><div class="gempty">${mascot('cheer')}<p>오늘 복습할 문제가 없어요<br>틀린 문제는 1일 · 3일 · 7일 뒤에 다시 나와요</p><button class="btn pri" data-go="home">홈으로</button></div></div>`
   if (!qz.list.length) return quizHeader() + `
   <div class="panel"><div class="gempty">${mascot('think')}<p>저장한 문법이 아직 없어요.<br><b>문법</b> 메뉴에서 헷갈리는 문법에 <b>☆ 저장</b>을 눌러 보세요</p>
@@ -1259,19 +1399,21 @@ function quizView() {
   const q = qz.list[qz.i]
   const answered = qz.picked !== null
   const ok = answered && q.choices[qz.picked].ok
+  const plen = c => [...c.html.replace(/<rt>.*?<\/rt>/g, '').replace(/<[^>]+>/g, '')].length
+  const maxLen = Math.max(...q.choices.map(plen))
+  const isKo = q.choices.some(c => c.ko)
+  const oneCol = isKo ? maxLen > 12 : maxLen > 8
+  const fsAll = oneCol ? (isKo ? 16 : 18) : Math.max(15, Math.min(20, Math.floor((isKo ? 160 : 148) / Math.max(maxLen, 1))))
   const buttons = q.choices.map((c, i) => {
     let cls = 'choice'
     if (answered && c.ok) cls += ' ok'
     else if (answered && i === qz.picked) cls += ' miss'
     // 글자 수에 맞춰 크기를 정해 항상 한 줄에 들어가게 한다 (폰 보기 칸 안쪽 폭 약 148px)
-    const len = [...c.html.replace(/<rt>.*?<\/rt>/g, '').replace(/<[^>]+>/g, '')].length
-    const fs = Math.max(12, Math.min(20, Math.floor((c.ko ? 160 : 148) / Math.max(len, 1))))
-    // 긴 한국어 보기(의성어 뜻풀이 등)는 두 줄까지 허용
-    if (c.ko && len > 12) cls += ' wrap'
-    return `<button class="${cls}" data-pick="${i}" style="--fs:${c.ko && len > 12 ? 14 : fs}px" ${c.ko ? '' : 'lang="ja"'} ${answered ? 'disabled' : ''}>${c.html}${answered && c.ok ? maruSVG() : ''}</button>`
+    if (oneCol) cls += ' wrap'
+    return `<button class="${cls}" data-pick="${i}" style="--fs:${fsAll}px" ${c.ko ? '' : 'lang="ja"'} ${answered ? 'disabled' : ''}>${c.html}${answered && c.ok ? maruSVG() : ''}</button>`
   }).join('')
   // 문장 배열: 아래 조각을 눌러 위 줄에 차례로 놓고, 놓은 조각을 누르면 되돌린다
-  let body = `<div class="choices">${buttons}</div>`
+  let body = `<div class="choices${oneCol ? ' one' : ''}">${buttons}</div>`
   if (q.order) {
     const built = qz.built || (qz.built = [])
     const placed = built.map((pi, k) => `<button class="opiece" data-act="unplace" data-k="${k}" lang="ja" ${answered ? 'disabled' : ''}>${q.order.parts[pi]}</button>`).join('')
@@ -1288,7 +1430,7 @@ function quizView() {
   <div class="feedback ${ok ? 'good' : 'bad'}" role="status">
     <div class="in">
       ${mascot(ok ? 'cheer' : 'sad', 'fmascot')}
-      <div class="ftext"><b>${ok ? '정답이에요' : '아쉬워요 · 내일 다시 복습해요'}${ok && qz.justMastered ? '<span class="masterpop">★ 마스터</span>' : ''}</b><span>${ok ? (q.right || '') : q.wrong}</span></div>
+      <div class="ftext"><b>${ok ? '정답이에요' : '아쉬워요'}${ok && qz.justMastered ? '<span class="masterpop">★ 마스터</span>' : ''}</b><span>${ok ? (q.right || '') : q.wrong}</span></div>
       <button class="btn pri" data-act="nextQ" id="nextbtn">${last ? '결과 보기' : '계속'}</button>
     </div>
   </div>` : ''
@@ -1322,6 +1464,7 @@ function quizDoneView() {
       </div>
     </div>
     ${qz.mock ? mockResultHTML(qz.mock) : ''}
+    ${qz.place ? placeResultHTML(qz.place) : ''}
     ${qz.newStamp ? `<div class="talkstampwin"><span class="tstamp big" lang="ja">${qz.newStamp.mark}</span><div><b>${qz.newStamp.name} 도장</b><small>장면 도장 ${Object.keys(progress.talkStamps).length} / ${TALK.length}</small></div></div>` : ''}
     ${state.quizMode === 'talk' && state.talkQuiz !== 'all' && !qz.newStamp && !progress.talkStamps[state.talkQuiz] ? `<p class="locknote">10문제 중 8개 이상 맞히면 장면 도장을 받아요</p>` : ''}
     ${rewardsHTML(qz)}
@@ -1341,6 +1484,7 @@ function pick(i) {
   const learned = m === 'kanji' ? 'learnedKanji' : m === 'grammar' ? 'learnedGrammar' : m === 'talk' ? 'learnedTalk' : m === 'ono' ? 'learnedOno' : 'learnedForms'
   const wrong = m === 'kanji' ? 'wrongKanji' : m === 'grammar' ? 'wrongGrammar' : m === 'talk' ? 'wrongTalk' : m === 'ono' ? 'wrongOno' : 'wrong'
   const ok = q.choices[i].ok
+  markStudy()
   // 기억 강도 복습: 틀리면 내일, 맞히면 3일 → 7일 뒤, 세 번 넘기면 끝
   const rv = progress.review || (progress.review = {})
   if (!ok) rv[q.key] = { step: 0, due: todayStr(1) }
@@ -1379,9 +1523,10 @@ function pick(i) {
 }
 
 // ───── 이벤트 ─────
-const VIEWS = { home: homeView, kanji: kanjiView, cards: cardsView, conj: conjView, grammar: grammarView, talk: talkView, quiz: quizPage }
+const VIEWS = { me: meView, home: homeView, kanji: kanjiView, cards: cardsView, conj: conjView, grammar: grammarView, talk: talkView, quiz: quizPage }
 
 function startStage(id) {
+  if (state.view !== 'quiz' || !SPECIAL.includes(state.quizMode)) history.pushState({ v: 'quiz' }, '')
   state.stage = id; state.quizMode = 'stage'; state.view = 'quiz'; state.kanji = null
   newQuiz(); render(); window.scrollTo(0, 0)
 }
@@ -1456,6 +1601,7 @@ const ACTIONS = {
         progress.talkStamps[state.talkQuiz] = todayStr(); qz.newStamp = talkScene(state.talkQuiz); bonus += 30
       }
       if (state.quizMode === 'review') todayStats().reviews++
+      if (state.quizMode === 'place') qz.place = applyPlacement(qz)
       if (state.quizMode === 'mock') {
         const sc = mockScore(qz); qz.mock = sc
         if (!progress.mock[state.mockLevel] || sc.score > progress.mock[state.mockLevel]) progress.mock[state.mockLevel] = sc.score
@@ -1479,6 +1625,30 @@ const ACTIONS = {
   quizMode(btn) { state.quizMode = btn.dataset.mode; newQuiz() },
   quizGrade(btn) { state.quizGrade = Number(btn.dataset.grade); newQuiz() },
   restartQuiz() { newQuiz() },
+  mockGo() { state.mockIntro = false; window.scrollTo(0, 0) },
+  startFix() { history.pushState({ v: 'quiz' }, ''); state.quizMode = 'fix'; state.view = 'quiz'; newQuiz(); render(); window.scrollTo(0, 0); return true },
+  startPlace() { history.pushState({ v: 'quiz' }, ''); state.quizMode = 'place'; state.view = 'quiz'; newQuiz(); render(); window.scrollTo(0, 0); return true },
+  fixPick(btn) {
+    if (state.fixDone) return true
+    const c = todayCorrection(); if (!c) return true
+    const i = Number(btn.dataset.i), ok = c.opts[i] === c.ans
+    state.fixDone = { i, ok }
+    markStudy()
+    const rv = progress.review || (progress.review = {})
+    if (ok) { todayStats().correct++; if (!progress.learnedGrammar.includes(c.key)) progress.learnedGrammar.push(c.key); addXP(10) }
+    else { rv[c.key] = { step: 0, due: todayStr(1) }; if (!progress.wrongGrammar.includes(c.key)) progress.wrongGrammar.push(c.key) }
+    saveProgress(); ok ? SFX.good() : SFX.bad()
+    if (ok) { const [x, y] = centerOf(btn); confetti(x, y, 24) }
+  },
+  meExport() { exportProgress(); return true },
+  meImport() { document.getElementById('importfile')?.click(); return true },
+  meReset() {
+    if (!confirm('모든 공부 기록을 지울까요?\n별, 고양이 친구, 배지, 복습 기록이 모두 사라지고 되돌릴 수 없어요')) return true
+    if (!confirm('정말 지울까요? 먼저 "기록 내보내기"로 저장해 두는 걸 권해요')) return true
+    try { localStorage.removeItem(STORE_KEY) } catch { /* 무시 */ }
+    location.reload(); return true
+  },
+  meSound() { toggleSoundPanel(); return true },
   petCat() {
     const b = buddy(), lines = CAT_LINES[b.id] || CAT_LINES.mike
     let say; do { say = pickOne(lines) } while (lines.length > 1 && say === state.catSay)
@@ -1488,8 +1658,8 @@ const ACTIONS = {
     state.catHopTimer = setTimeout(() => { state.catHop = false; if (state.view === 'home') render() }, 1400)
     return true
   },
-  startReview() { state.quizMode = 'review'; state.view = 'quiz'; newQuiz(); render(); window.scrollTo(0, 0); return true },
-  startMock(btn) { if (!isOpen('grammar', btn.dataset.level)) return true; state.mockLevel = btn.dataset.level; state.quizMode = 'mock'; state.view = 'quiz'; newQuiz(); render(); window.scrollTo(0, 0); return true },
+  startReview() { history.pushState({ v: 'quiz' }, ''); state.quizMode = 'review'; state.view = 'quiz'; newQuiz(); render(); window.scrollTo(0, 0); return true },
+  startMock(btn) { if (!isOpen('grammar', btn.dataset.level)) return true; history.pushState({ v: 'quiz' }, ''); state.mockLevel = btn.dataset.level; state.mockIntro = true; state.quizMode = 'mock'; state.view = 'quiz'; newQuiz(); render(); window.scrollTo(0, 0); return true },
   openChest(btn) {
     const t = todayStats()
     if (t.chest || todayMissions().some(m => m.get(t) < m.need)) return true
@@ -1502,8 +1672,8 @@ const ACTIONS = {
   },
   reportCard(btn) { showReportCard(btn.dataset.school); return true },
   onoQuiz() { const w = cardList()[cardIndex()]; state.quizMode = 'ono'; state.onoQuiz = w ? w.cat : 'all'; state.quizTab = 'free'; go('quiz'); return true },
-  talkOpen(btn) { state.talkScene = btn.dataset.id; todayStats().scenes = (todayStats().scenes || 0) + 1; saveProgress(); SFX.tap(); window.scrollTo(0, 0) },
-  talkBack() { state.talkScene = null; window.scrollTo(0, 0) },
+  talkOpen(btn) { history.pushState({ v: 'talk', scene: btn.dataset.id }, ''); state.talkScene = btn.dataset.id; todayStats().scenes = (todayStats().scenes || 0) + 1; saveProgress(); SFX.tap(); window.scrollTo(0, 0) },
+  talkBack() { history.back(); return true },
   talkCasual() { state.showCasual = !state.showCasual; SFX.tap() },
   talkQuiz() { state.quizMode = 'talk'; state.talkQuiz = state.talkScene || 'all'; state.quizTab = 'free'; go('quiz'); return true },
   place(btn) { const qz = state.quiz; if (qz.picked !== null) return true; qz.built.push(Number(btn.dataset.p)); SFX.tap() },
@@ -1674,6 +1844,7 @@ document.addEventListener('click', e => {
 // 아이폰은 화면을 눌러야 소리가 나므로, "눌러서 시작"을 누를 때 팡파르와 배경음악이 함께 시작된다
 function showOpening() {
   try { if (sessionStorage.getItem('opened')) return } catch { /* 저장 못 하면 매번 보여 준다 */ }
+  if (progress.openedOn === todayStr()) return   // 하루 첫 실행에만 오프닝
   const reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches
   const s = streak()
   const title = '일본어 첫걸음'
@@ -1692,13 +1863,16 @@ function showOpening() {
     </div>
     <h1 class="op-title">${[...title].map((c, i) => c === ' ' ? '<span class="sp"> </span>' : `<span style="--i:${i}">${c}</span>`).join('')}</h1>
     <p class="op-sub"><span class="lvchip"><b class="num">Lv.${playerLevel()}</b>${rankName()}</span>${s >= 2 ? `<span class="op-streak">${s}일 연속</span>` : ''}</p>
-    <button class="btn pri op-start">눌러서 시작</button>`
+    <div class="op-btns"><button class="btn pri op-start" data-snd="on">소리 켜고 시작</button><button class="btn op-quiet" data-snd="off">조용히 시작</button></div>`
   document.body.appendChild(el)
   document.documentElement.classList.add('opening')
   // 도장이 찍히는 순간 꽃잎이 터진다
   setTimeout(() => { const h = el.querySelector('.op-hanko'); if (h && el.isConnected) { const [x, y] = centerOf(h); confetti(x, y, 30) } }, reduce ? 0 : 1080)
-  const close = () => {
+  const close = e => {
     if (el.classList.contains('out')) return
+    const b = e && e.target && e.target.closest ? e.target.closest('[data-snd]') : null
+    if (b) { const on = b.dataset.snd === 'on'; progress.music = on; progress.sound = on; if (on) { buildSfx(); playBgm() } else stopBgm(); updateTop() }
+    progress.openedOn = todayStr(); saveProgress()
     el.classList.add('out')
     SFX.open()
     try { sessionStorage.setItem('opened', '1') } catch { /* 무시 */ }

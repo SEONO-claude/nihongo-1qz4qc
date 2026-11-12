@@ -854,3 +854,56 @@ button.hero-mascot { border: 0; background: none; padding: 0; cursor: pointer; f
 .schoolsvg .win { fill: var(--c, var(--pink)); }
 .schoolsvg .flag { stroke: #fff; stroke-width: 1.1; fill: none; }
 .newcat.grow { background: var(--sky-t); }
+
+/* ───── 꼭 고칠 것: 아래 탭 · 내 정보 · 교정 · 진단 ───── */
+main { padding-bottom: calc(104px + env(safe-area-inset-bottom)); }
+.tabbar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; display: grid; grid-template-columns: repeat(5, 1fr); max-width: 640px; margin: 0 auto; padding: 6px 4px calc(6px + env(safe-area-inset-bottom)); background: var(--card); border-top: 1px solid var(--line); box-shadow: 0 -4px 16px var(--shadow); }
+@media (min-width: 641px) { .tabbar { border: 1px solid var(--line); border-bottom: 0; border-radius: 20px 20px 0 0; } }
+.tabbar button { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-height: 52px; padding: 4px 2px; border: 0; border-radius: 12px; background: none; color: var(--ink-3); font-family: var(--round); font-size: 12px; cursor: pointer; }
+.tabbar svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.tabbar button.on { color: var(--pink-d); background: var(--pink-t); }
+body.quizzing .tabbar { display: none; }
+body.quizzing main { padding-bottom: calc(40px + env(safe-area-inset-bottom)); }
+.mebtn { display: grid; place-items: center; width: 44px; height: 44px; border: 2px solid var(--line); border-radius: 50%; background: var(--card); color: var(--ink-2); cursor: pointer; }
+.mebtn svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; }
+.xpbadge { height: 40px; font-size: 16px; }
+
+/* 정답 알림: 화면 아래에 붙어 따라온다(흐름 안이라 주소창에 가리지 않음) */
+.feedback { position: sticky; bottom: calc(10px + env(safe-area-inset-bottom)); z-index: 5; box-shadow: 0 6px 24px var(--shadow); }
+.feedback .btn { min-height: 48px; }
+
+/* 긴 보기는 한 줄에 하나, 글자는 줄이지 않는다 */
+.choices.one { grid-template-columns: 1fr; }
+.choices.one .choice { min-height: 60px; padding: 10px 14px; line-height: 1.7; text-align: left; }
+.choice.wrap { white-space: normal; word-break: keep-all; overflow-wrap: anywhere; }
+
+/* 단어 카드 | 한자 표 */
+.seg { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin: 0 0 16px; padding: 4px; border-radius: 14px; background: var(--raised); }
+.seg button { min-height: 44px; border: 0; border-radius: 10px; background: none; color: var(--ink-2); font-family: var(--round); font-size: 16px; cursor: pointer; }
+.seg button.on { background: var(--card); color: var(--ink); box-shadow: 0 2px 6px var(--shadow); }
+
+/* 오늘의 교정: 홈에서 바로 풀기 */
+.fixsent { margin: 4px 0 2px; font-size: 22px; line-height: 2; }
+.fixsent .blank { color: var(--pink-d); }
+.fixko { margin: 0 0 10px; color: var(--ink-2); font-size: 14px; }
+.fixopts { display: grid; gap: 8px; }
+.fixopt { min-height: 52px; font-size: 19px; line-height: 1.7; text-align: left; padding: 8px 14px; }
+.fixcard .actions { margin-top: 12px; }
+
+/* 실력 진단 안내 */
+.placehint { font-size: 13px; color: var(--ink-2); }
+.mockintro ul { margin: 8px 0 14px; padding-left: 20px; line-height: 1.8; color: var(--ink-2); }
+.op-btns { display: flex; flex-direction: column; gap: 10px; width: min(280px, 80vw); }
+.op-btns .btn { width: 100%; min-height: 52px; }
+
+/* 내 정보 */
+.mehead { display: flex; align-items: center; gap: 16px; margin-bottom: 16px; }
+.mehead img { width: 96px; height: 96px; flex: none; object-fit: contain; }
+.mehead h1 { margin: 4px 0; font-family: var(--round); font-size: 28px; font-weight: 400; }
+.mehead p { margin: 0; color: var(--ink-2); font-size: 14px; }
+.melist { display: grid; gap: 8px; }
+.merow { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; min-height: 56px; padding: 10px 14px; border: 2px solid var(--line); border-radius: 14px; background: var(--card); color: var(--ink); text-align: left; cursor: pointer; }
+.merow b { font-family: var(--round); font-size: 17px; font-weight: 400; }
+.merow span { font-size: 13px; color: var(--ink-3); }
+.merow.danger b { color: var(--bad-d); }
+.menote { margin: 0; font-size: 14px; line-height: 1.7; color: var(--ink-2); }

@@ -44,7 +44,7 @@ function unlocksAt(stageId) {
 // 레벨과 칭호: 지금 도전 중인 학년이 곧 내 학년
 function playerLevel() { return clearedCount() + 1 }
 function rankName() {
-  if (STAGES.every(s => stageCleared(s.id))) return '고등학교 졸업 · 일본어 마스터'
+  if (STAGES.every(s => stageCleared(s.id))) return '고등학교 졸업생'
   const st = STAGES[currentStageIndex()]
   return `${schoolOf(st.school).name} ${st.boss ? '졸업반' : st.name}`
 }
@@ -101,7 +101,7 @@ const BADGES = [
   { id: 'onoall', mark: '響', name: '의성어 도감 완성', desc: '의성어 카드 모두 보기', ok: () => typeof ONO !== 'undefined' && seenCount('ono') >= ONO.length },
   { id: 'master30', mark: '極', name: '마스터 30', desc: '문법·한자·문장 30개 마스터(3연속 정답)', ok: () => Object.values(progress.master || {}).filter(v => v === 3).length >= 30 },
   { id: 'chest7', mark: '宝', name: '보물 사냥꾼', desc: '보물상자 7번 열기', ok: () => (progress.chests || 0) >= 7 },
-  { id: 'mockpass', mark: '合', name: '합격 예상', desc: 'JLPT 모의고사 합격선 넘기', ok: () => Object.entries(progress.mock || {}).some(([l, s]) => s >= ({ N5: 80, N4: 90, N3: 95, N2: 90, N1: 100 })[l]) },
+  { id: 'mockpass', mark: '合', name: '합격선 돌파', desc: 'JLPT 실력 체크에서 합격선 넘기', ok: () => Object.entries(progress.mock || {}).some(([l, s]) => s >= ({ N5: 80, N4: 90, N3: 95, N2: 90, N1: 100 })[l]) },
   { id: 'elem', mark: '小', name: '초등 졸업', desc: '초등학교 졸업 시험 통과', ok: () => progress.graduated.includes('elem') },
   { id: 'mid', mark: '中', name: '중학 졸업', desc: '중학교 졸업 시험 통과', ok: () => progress.graduated.includes('mid') },
   { id: 'high', mark: '高', name: '고등 졸업', desc: '고등학교 졸업 시험 통과', ok: () => progress.graduated.includes('high') },

@@ -18,16 +18,16 @@
 <body>
 <header class="top">
   <button class="brand" data-go="home"><span class="mark paw" aria-hidden="true"><svg viewBox="0 0 24 24"><ellipse cx="12" cy="15.6" rx="5.2" ry="4.3"/><ellipse cx="5.9" cy="10.2" rx="2.1" ry="2.5" transform="rotate(-18 5.9 10.2)"/><ellipse cx="9.7" cy="6.6" rx="2.2" ry="2.7" transform="rotate(-6 9.7 6.6)"/><ellipse cx="14.3" cy="6.6" rx="2.2" ry="2.7" transform="rotate(6 14.3 6.6)"/><ellipse cx="18.1" cy="10.2" rx="2.1" ry="2.5" transform="rotate(18 18.1 10.2)"/></svg></span>일본어 첫걸음</button>
-  <nav>
-    <button data-go="kanji">한자</button>
-    <button data-go="cards"><span class="l">단어 카드</span><span class="s">단어</span></button>
-    <button data-go="talk">회화</button>
-    <button data-go="grammar">문법</button>
-    <button data-go="quiz">퀘스트</button>
-  </nav>
-  <div class="topright"><span class="xpbadge" id="xp"></span><button class="soundbtn" id="musicbtn" data-act="music"></button><button class="soundbtn" id="soundbtn" data-act="sound"></button></div>
+  <div class="topright"><span class="xpbadge" id="xp"></span><button class="mebtn" data-go="me" aria-label="내 정보 · 설정"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z M4 21c1.2-4 4.3-6 8-6s6.8 2 8 6"/></svg></button></div>
 </header>
 <main id="app"></main>
+<nav class="tabbar" aria-label="메뉴">
+  <button data-go="home"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11.5 12 4l9 7.5 M5.5 9.5V20h13V9.5 M10 20v-5h4v5"/></svg><span>홈</span></button>
+  <button data-go="quiz"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 21V4 M5 4h11l-2 4 2 4H5"/></svg><span>퀘스트</span></button>
+  <button data-go="cards"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5.5A1.5 1.5 0 0 1 5.5 4H11v16H5.5A1.5 1.5 0 0 1 4 18.5z M13 4h5.5A1.5 1.5 0 0 1 20 5.5v13a1.5 1.5 0 0 1-1.5 1.5H13z"/></svg><span>단어·한자</span></button>
+  <button data-go="grammar"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6h12 M8 12h12 M8 18h12 M4 6h.01 M4 12h.01 M4 18h.01"/></svg><span>문법</span></button>
+  <button data-go="talk"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a7 7 0 0 1-10.4 6.1L4 20l1.6-4.7A7 7 0 1 1 20 12Z"/></svg><span>회화</span></button>
+</nav>
 
 <script src="data/words.js"></script>
 <script src="data/adjectives.js"></script>
