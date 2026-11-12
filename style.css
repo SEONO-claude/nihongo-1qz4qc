@@ -92,6 +92,8 @@ rt { color: var(--ink-3); font-size: max(0.5em, 11px); font-family: var(--jp); }
 .xpbadge { display: inline-flex; align-items: center; gap: 4px; height: 34px; padding: 0 12px; border-radius: 999px; background: var(--sun-t); color: var(--ink); font-family: var(--round); font-size: 15px; }
 .xpbadge b { font-weight: 400; color: var(--sun-d); }
 .soundbtn { width: 38px; height: 38px; border-radius: 12px; border: 2px solid var(--line); background: var(--card); display: grid; place-items: center; color: var(--ink-2); }
+.soundbtn.off { color: var(--ink-3); opacity: 0.6; }
+.topright { display: flex; align-items: center; gap: 6px; }
 
 main { max-width: 640px; margin: 0 auto; padding: 28px 16px 96px; }
 .title { font-family: var(--round); font-size: 26px; font-weight: 400; margin: 0 0 16px; }

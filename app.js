@@ -1,6 +1,6 @@
 // ───── 진도 저장 (localStorage) ─────
 const STORE_KEY = 'jp-study-progress'
-const EMPTY = { seen: {}, seenKanji: [], learnedForms: [], wrong: [], learnedKanji: [], wrongKanji: [], lastStudy: '', studyDays: [], today: { date: '', cards: 0, quizzes: 0, xp: 0 }, xp: 0, sound: true, savedGrammar: [], seenGrammar: [], learnedGrammar: [], wrongGrammar: [] }
+const EMPTY = { seen: {}, seenKanji: [], learnedForms: [], wrong: [], learnedKanji: [], wrongKanji: [], lastStudy: '', studyDays: [], today: { date: '', cards: 0, quizzes: 0, xp: 0 }, xp: 0, sound: true, music: true, savedGrammar: [], seenGrammar: [], learnedGrammar: [], wrongGrammar: [] }
 
 function loadProgress() {
   try { return { ...EMPTY, ...JSON.parse(localStorage.getItem(STORE_KEY) || '{}') } }
@@ -55,14 +55,75 @@ function audio() {
   if (audioCtx.state !== 'running') audioCtx.resume().catch(() => {})
   return audioCtx
 }
-function unlockAudio() {
-  if (!progress.sound) return
+// 아이폰은 Web Audio 소리를 무음 모드에서 막지만, 오디오 플레이어(<audio>)는 무음 모드에서도 소리가 난다.
+// 오디오 플레이어가 재생 중이면 Web Audio 효과음도 같이 나므로, 첫 터치 때 배경음악(또는 소리 없는 오디오)을 튼다.
+function silentWavURL() {
+  const n = 4000, buf = new Uint8Array(44 + n), v = new DataView(buf.buffer)
+  const str = (o, s) => [...s].forEach((c, i) => buf[o + i] = c.charCodeAt(0))
+  str(0, 'RIFF'); v.setUint32(4, 36 + n, true); str(8, 'WAVEfmt '); v.setUint32(16, 16, true)
+  v.setUint16(20, 1, true); v.setUint16(22, 1, true); v.setUint32(24, 8000, true); v.setUint32(28, 8000, true)
+  v.setUint16(32, 1, true); v.setUint16(34, 8, true); str(36, 'data'); v.setUint32(40, n, true)
+  buf.fill(128, 44)
+  return URL.createObjectURL(new Blob([buf], { type: 'audio/wav' }))
+}
+let keepAlive = null, bgm = null, bgmGain = null, bgmURL = null
+const BGM_VOLUME = 0.7   // 음악 파일 자체를 작게(-26 LUFS) 만들어 두었으므로 여기서는 조금만 줄인다
+
+// 배경음악 파일을 미리 받아 둔다 (첫 터치 때 바로 틀 수 있게)
+;(function preloadBgm() {
+  // 한 파일로 묶은 페이지(claude.ai 링크)에는 음악이 글자로 들어 있어 직접 풀어 쓴다
+  if (window.APP_AUDIO) {
+    try {
+      const bin = atob(window.APP_AUDIO.split(',')[1]), bytes = new Uint8Array(bin.length)
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
+      bgmURL = URL.createObjectURL(new Blob([bytes], { type: 'audio/mpeg' }))
+    } catch { /* 음악 없이 */ }
+    return
+  }
+  fetch('audio/bgm.mp3').then(r => r.ok ? r.blob() : null).then(b => { if (b) bgmURL = URL.createObjectURL(b) }).catch(() => {})
+})()
+
+function playBgm() {
+  if (!bgmURL) return false
   try {
-    const c = audio(), b = c.createBuffer(1, 1, 22050), s = c.createBufferSource()
-    s.buffer = b; s.connect(c.destination); s.start(0)
+    if (!bgm) {
+      bgm = new Audio(bgmURL); bgm.loop = true; bgm.preload = 'auto'
+      // 아이폰은 오디오 플레이어 볼륨을 못 바꾸므로 Web Audio 볼륨 조절기를 거친다
+      const c = audio(), node = c.createMediaElementSource(bgm)
+      bgmGain = c.createGain(); bgmGain.gain.value = BGM_VOLUME
+      node.connect(bgmGain); bgmGain.connect(c.destination)
+    }
+    bgm.play().catch(() => {})
+    return true
+  } catch { return false }
+}
+function stopBgm() { if (bgm) bgm.pause() }
+
+function startAudio() {
+  if (!progress.sound && !progress.music) return
+  try {
+    audio()
+    if (progress.music && playBgm()) { if (keepAlive) keepAlive.pause(); return }
+    if (progress.sound) {
+      keepAlive = keepAlive || Object.assign(new Audio(silentWavURL()), { loop: true })
+      keepAlive.play().catch(() => {})
+    }
   } catch { /* 소리를 낼 수 없는 기기 */ }
 }
-for (const ev of ['touchend', 'pointerdown', 'keydown']) document.addEventListener(ev, unlockAudio, { once: true, passive: true, capture: true })
+// 첫 터치마다 시도하고, 소리가 켜지면 더 하지 않는다
+function onGesture() {
+  startAudio()
+  const playing = (bgm && !bgm.paused) || (keepAlive && !keepAlive.paused)
+  if (playing && audioCtx && audioCtx.state === 'running') {
+    for (const ev of ['touchend', 'click', 'keydown']) document.removeEventListener(ev, onGesture, true)
+  }
+}
+for (const ev of ['touchend', 'click', 'keydown']) document.addEventListener(ev, onGesture, true)
+// 다른 앱으로 가면 배경음악을 멈추고, 돌아오면 다시 튼다
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) stopBgm()
+  else if (progress.music && bgm) bgm.play().catch(() => {})
+})
 
 function tone(freqs, { dur = 0.13, type = 'triangle', gap = 0.09, vol = 0.16 } = {}) {
   if (!progress.sound) return
@@ -158,6 +219,8 @@ const ICONS = {
   left: 'm15 18-6-6 6-6', right: 'm9 18 6-6-6-6',
   sound: 'M11 5 6 9H2v6h4l5 4V5Z M15.5 8.5a5 5 0 0 1 0 7 M19 5a10 10 0 0 1 0 14',
   mute: 'M11 5 6 9H2v6h4l5 4V5Z M22 9l-6 6 M16 9l6 6',
+  music: 'M9 18V5l12-2v13 M6 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z M18 19a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z',
+  musicOff: 'M9 18V5l12-2v13 M6 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z M18 19a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z M3 3l18 18',
 }
 function icon(name) {
   return `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="${ICONS[name]}"/></svg>`
@@ -244,6 +307,13 @@ function updateTop() {
   if (s) {
     s.innerHTML = `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="${ICONS[progress.sound ? 'sound' : 'mute']}"/></svg>`
     s.setAttribute('aria-label', progress.sound ? '효과음 끄기' : '효과음 켜기')
+    s.classList.toggle('off', !progress.sound)
+  }
+  const m = document.getElementById('musicbtn')
+  if (m) {
+    m.innerHTML = `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="${ICONS[progress.music ? 'music' : 'musicOff']}"/></svg>`
+    m.setAttribute('aria-label', progress.music ? '배경음악 끄기' : '배경음악 켜기')
+    m.classList.toggle('off', !progress.music)
   }
 }
 
@@ -706,7 +776,13 @@ const VIEWS = { home: homeView, kanji: kanjiView, cards: cardsView, conj: conjVi
 const ACTIONS = {
   prevCard() { state.cardIdx[state.cardType]--; state.kanji = null; state.slide = 'prev'; markSeen(); SFX.tap() },
   nextCard() { state.cardIdx[state.cardType]++; state.kanji = null; state.slide = 'next'; markSeen(); SFX.tap() },
-  sound() { progress.sound = !progress.sound; saveProgress(); updateTop(); SFX.tap(); return true },
+  sound() { progress.sound = !progress.sound; saveProgress(); updateTop(); startAudio(); SFX.tap(); return true },
+  music() {
+    progress.music = !progress.music; saveProgress(); updateTop()
+    if (!progress.music) stopBgm()
+    startAudio()   // 음악을 꺼도 효과음이 무음 모드에서 나도록 소리 없는 오디오를 이어서 튼다
+    return true
+  },
   grammarLevel(btn) { state.grammarLevel = btn.dataset.level; state.grammarOpen = null },
   grammarQuiz() { state.quizMode = 'grammar'; state.quizLevel = state.grammarLevel; go('quiz'); return true },
   grammarOpen(btn) {
