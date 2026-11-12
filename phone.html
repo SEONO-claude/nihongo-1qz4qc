@@ -8,10 +8,10 @@
 <style>
   /* 앱을 아이폰 16 Pro 화면 크기(402×874)로 보여 주는 미리보기. 창 크기에 맞춰 통째로 줄인다 */
   html, body { margin: 0; height: 100%; background: #e9e4dc; font-family: system-ui, sans-serif; }
-  .wrap { height: 100%; display: grid; place-items: center; overflow: hidden; }
+  .wrap { position: fixed; inset: 0; overflow: hidden; }
   .phone {
-    position: relative; padding: 12px; border-radius: 62px; background: #1b1b1f;
-    box-shadow: 0 0 0 2px #3a3a40, 0 30px 60px rgba(0, 0, 0, 0.25); transform-origin: center center;
+    position: absolute; left: 50%; top: calc(50% + 14px); padding: 12px; border-radius: 62px; background: #1b1b1f;
+    box-shadow: 0 0 0 2px #3a3a40, 0 30px 60px rgba(0, 0, 0, 0.25); transform-origin: 0 0;
   }
   .screen { position: relative; width: 402px; height: 874px; border-radius: 50px; overflow: hidden; background: #fff; }
   /* 홈 화면에 추가한 앱처럼: 위 상태 표시줄(시계·배터리) 54px 아래부터 앱이 보인다 */
@@ -38,8 +38,9 @@
 <script>
   const phone = document.getElementById('phone')
   function fit() {
-    const s = Math.min(1, (innerHeight - 44) / 898, (innerWidth - 24) / 426)
-    phone.style.transform = `scale(${s})`
+    // 틀(426×898)이 창 안에 다 들어가게 줄이고, 가운데에 둔다 (위 28px는 안내 글자 자리)
+    const s = Math.min(1, (innerHeight - 48) / 898, (innerWidth - 24) / 426)
+    phone.style.transform = `scale(${s}) translate(-50%, -50%)`
   }
   addEventListener('resize', fit); fit()
   document.getElementById('reload').onclick = () => document.getElementById('app').contentWindow.location.reload()
