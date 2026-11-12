@@ -331,7 +331,7 @@ function homeView() {
   const dk = dailyKanji(), k = KANJI[dk], [ew, er, em] = k.examples[0]
   const todayKanji = `
   <button class="panel daily" data-act="todayKanji" aria-label="오늘의 한자 ${dk} 자세히">
-    <span class="eyebrow">오늘의 한자 <span class="num">· 초등 ${k.grade}학년</span></span>
+    <span class="eyebrow">오늘의 한자 <span class="num">· ${gradeLong(k.grade)}</span></span>
     <span class="daily-body">
       <span class="masu xl" lang="ja">${dk}</span>
       <span class="daily-text">
@@ -389,7 +389,7 @@ function homeView() {
   <div class="panel">
     <div class="hd">지금까지</div>
     ${bar('초등 한자 전체', allK, totalK)}
-    ${bar('1학년 한자', g1, GRADE1_ORDER.length)}
+    ${bar('중학 한자', progress.seenKanji.filter(c => KANJI[c] && KANJI[c].grade >= 7).length, Object.values(KANJI).filter(k => k.grade >= 7).length || 1110)}
     ${bar('동사 카드', seenCount('verb'), WORDS.length)}
     ${bar('형용사 카드', seenCount('adj'), ADJECTIVES.length)}
     ${bar('명사 카드', seenCount('noun'), NOUNS.length)}
@@ -412,8 +412,8 @@ function kanjiView() {
   const grades = [...new Set(Object.values(KANJI).map(k => k.grade))].sort((a, b) => a - b)
   const list = kanjiList(state.grade)
   const seen = list.filter(c => progress.seenKanji.includes(c)).length
-  const tabs = grades.map(g => `<button class="${g === state.grade ? 'on' : ''}" data-act="grade" data-grade="${g}">${g}학년</button>`).join('')
-  const sub =`${state.grade}학년 한자 ${list.length}자 · 본 한자 <span class="num">${seen} / ${list.length}</span>`
+  const tabs = grades.map(g => `<button class="${g === state.grade ? 'on' : ''}" data-act="grade" data-grade="${g}">${gradeName(g)}</button>`).join('')
+  const sub = `${state.grade <= 6 ? `초등 ${state.grade}학년` : `중학 ${state.grade - 6}묶음 (자주 쓰는 순)`} 한자 ${list.length}자 · 본 한자 <span class="num">${seen} / ${list.length}</span>`
   const cells = list.map(c => {
     const cls = ['masu', 'kcell', progress.seenKanji.includes(c) ? 'seen' : '', state.kanji === c ? 'on' : ''].join(' ')
     return `<button class="${cls}" data-kanji="${c}" lang="ja" title="${KANJI[c].meaning}">${c}</button>`
@@ -425,7 +425,7 @@ function kanjiView() {
     <div class="banner-text"><h1>초등 필수 한자</h1><p><span class="num">${seenAll} / ${Object.keys(KANJI).length}</span>자를 봤어요</p></div>
   </section>
   <div class="tabs">${tabs}</div>
-  <div class="subbar"><p class="sub">${sub}</p><button class="btn" data-act="kanjiQuiz">${state.grade}학년 한자 퀴즈</button></div>
+  <div class="subbar"><p class="sub">${sub}</p><button class="btn" data-act="kanjiQuiz">${gradeName(state.grade)} 한자 퀴즈</button></div>
   ${state.kanji && KANJI[state.kanji] ? `<div class="panel" id="kdetail">${kanjiInfo(state.kanji)}</div>` : ''}
   <div class="panel"><div class="kgrid">${cells}</div>
     <div class="hint">한자를 누르면 뜻과 읽는 법이 나와요 · 본 한자에는 빨간 점</div></div>`
@@ -439,7 +439,7 @@ function kanjiInfo(text) {
     return `<div class="kinfo">
       <span class="masu xl" lang="ja">${ch}</span>
       <div>
-        <div class="kname">${k.meaning}<span class="grade">초등 ${k.grade}학년</span></div>
+        <div class="kname">${k.meaning}<span class="grade">${gradeLong(k.grade)}</span></div>
         <dl class="kv">
           <dt>훈독</dt><dd><span lang="ja">${k.kun.join('、') || '없음'}</span><small>일본 고유의 읽기 · 혼자 쓰일 때</small></dd>
           <dt>음독</dt><dd><span lang="ja">${k.on.join('、')}</span><small>중국에서 온 읽기 · 한자 두 개 단어일 때</small></dd>
@@ -739,7 +739,7 @@ function quizHeader() {
   const grades = state.quizMode === 'verb'
     ? `<select class="gradesel" data-act="verbLevelSel" aria-label="동사 수준 고르기">${['all', 'elem', 'mid', 'high'].map(l => `<option value="${l}" ${state.verbQuizLevel === l ? 'selected' : ''}>${l === 'all' ? '전체 동사' : `${VERB_LEVELS[l]} 동사`}</option>`).join('')}</select>`
     : state.quizMode === 'kanji'
-    ? `<select class="gradesel" data-act="quizGradeSel" aria-label="학년 고르기">${[0, 1, 2, 3, 4, 5, 6].map(g => `<option value="${g}" ${state.quizGrade === g ? 'selected' : ''}>${g ? `${g}학년` : '전체 학년'}</option>`).join('')}</select>`
+    ? `<select class="gradesel" data-act="quizGradeSel" aria-label="학년 고르기">${[0, ...new Set(Object.values(KANJI).map(k => k.grade))].sort((a, b) => a - b).map(g => `<option value="${g}" ${state.quizGrade === g ? 'selected' : ''}>${g ? (g <= 6 ? `초등 ${g}학년` : `중학 ${g - 6}묶음`) : '전체 한자'}</option>`).join('')}</select>`
     : state.quizMode === 'grammar'
     ? `<select class="gradesel" data-act="quizLevelSel" aria-label="급수 고르기">${[...LEVELS, 'all', 'saved'].map(l => `<option value="${l}" ${state.quizLevel === l ? 'selected' : ''}>${l === 'all' ? '전체 급수' : l === 'saved' ? `★ 저장한 문법 (${progress.savedGrammar.length})` : l}</option>`).join('')}</select>`
     : ''

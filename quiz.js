@@ -65,7 +65,7 @@ function buildVerbQuiz(wrongKeys, level = 'all') {
 // ───── 퀘스트: 초등학교 → 중학교 → 고등학교 ─────
 // 스테이지마다 10문제를 여러 종류에서 섞어 낸다. part: { t: 'kanji'|'verb'|'grammar', n, ... }
 const SCHOOLS = [
-  { id: 'elem', name: '초등학교', mark: '小', color: 'pink', reward: '졸업장 · 중학 동사 · N4 문법',
+  { id: 'elem', name: '초등학교', mark: '小', color: 'pink', reward: '졸업장 · 중학 한자 1110자 · 중학 동사 · N4 문법',
     stages: [
       { id: 'e1', name: '1학년', parts: [{ t: 'kanji', grades: [1], n: 6 }, { t: 'verb', level: 'elem', n: 2 }, { t: 'grammar', levels: ['N5'], n: 2 }] },
       { id: 'e2', name: '2학년', parts: [{ t: 'kanji', grades: [2], n: 5 }, { t: 'verb', level: 'elem', n: 3 }, { t: 'grammar', levels: ['N5'], n: 2 }] },
@@ -77,27 +77,32 @@ const SCHOOLS = [
     ] },
   { id: 'mid', name: '중학교', mark: '中', color: 'sky', reward: '졸업장 · 고등 동사 · N2 문법',
     stages: [
-      { id: 'm1', name: '1학년', parts: [{ t: 'verb', level: 'mid', n: 5 }, { t: 'grammar', levels: ['N4'], n: 3 }, { t: 'kanji', grades: [4, 5, 6], n: 2 }] },
-      { id: 'm2', name: '2학년', parts: [{ t: 'verb', level: 'mid', n: 5 }, { t: 'grammar', levels: ['N4', 'N3'], n: 3 }, { t: 'kanji', grades: [5, 6], n: 2 }] },
-      { id: 'm3', name: '3학년', parts: [{ t: 'verb', level: 'mid', n: 4 }, { t: 'grammar', levels: ['N3'], n: 4 }, { t: 'kanji', grades: [6], n: 2 }] },
-      { id: 'mf', name: '졸업 시험', boss: true, parts: [{ t: 'verb', level: 'mid', n: 4 }, { t: 'grammar', levels: ['N4', 'N3'], n: 4 }, { t: 'kanji', grades: [1, 2, 3, 4, 5, 6], n: 2 }] },
+      { id: 'm1', name: '1학년', parts: [{ t: 'kanji', grades: [7], n: 4 }, { t: 'verb', level: 'mid', n: 3 }, { t: 'grammar', levels: ['N4'], n: 3 }] },
+      { id: 'm2', name: '2학년', parts: [{ t: 'kanji', grades: [8], n: 4 }, { t: 'verb', level: 'mid', n: 3 }, { t: 'grammar', levels: ['N4', 'N3'], n: 3 }] },
+      { id: 'm3', name: '3학년', parts: [{ t: 'kanji', grades: [9], n: 4 }, { t: 'verb', level: 'mid', n: 3 }, { t: 'grammar', levels: ['N3'], n: 3 }] },
+      { id: 'mf', name: '졸업 시험', boss: true, parts: [{ t: 'kanji', grades: [7, 8, 9], n: 4 }, { t: 'verb', level: 'mid', n: 3 }, { t: 'grammar', levels: ['N4', 'N3'], n: 3 }] },
     ] },
   { id: 'high', name: '고등학교', mark: '高', color: 'leaf', reward: '졸업장 · JLPT 마스터',
     stages: [
-      { id: 'h1', name: '1학년', parts: [{ t: 'verb', level: 'high', n: 5 }, { t: 'grammar', levels: ['N3'], n: 5 }] },
-      { id: 'h2', name: '2학년', parts: [{ t: 'verb', level: 'high', n: 5 }, { t: 'grammar', levels: ['N2'], n: 5 }] },
-      { id: 'h3', name: '3학년', parts: [{ t: 'verb', level: 'high', n: 4 }, { t: 'grammar', levels: ['N2', 'N1'], n: 6 }] },
-      { id: 'hf', name: '졸업 시험', boss: true, parts: [{ t: 'verb', level: 'high', n: 4 }, { t: 'grammar', levels: ['N2', 'N1'], n: 6 }] },
+      { id: 'h1', name: '1학년', parts: [{ t: 'verb', level: 'high', n: 4 }, { t: 'grammar', levels: ['N3'], n: 4 }, { t: 'kanji', grades: [7, 8, 9], n: 2 }] },
+      { id: 'h2', name: '2학년', parts: [{ t: 'verb', level: 'high', n: 4 }, { t: 'grammar', levels: ['N2'], n: 4 }, { t: 'kanji', grades: [7, 8, 9], n: 2 }] },
+      { id: 'h3', name: '3학년', parts: [{ t: 'verb', level: 'high', n: 4 }, { t: 'grammar', levels: ['N2', 'N1'], n: 4 }, { t: 'kanji', grades: [8, 9], n: 2 }] },
+      { id: 'hf', name: '졸업 시험', boss: true, parts: [{ t: 'verb', level: 'high', n: 4 }, { t: 'grammar', levels: ['N2', 'N1'], n: 4 }, { t: 'kanji', grades: [7, 8, 9], n: 2 }] },
     ] },
 ]
 const STAGES = SCHOOLS.flatMap(s => s.stages.map(st => ({ ...st, school: s.id })))
 const PASS = 8   // 10문제 중 8개 이상이면 통과
 
+// 한자 학년 이름: 1~6 = 초등, 7~9 = 중1~중3 (중학 한자는 자주 쓰는 순으로 세 묶음)
+function gradeName(g) { return g <= 6 ? `${g}학년` : `중${g - 6}` }
+function gradeLong(g) { return g <= 6 ? `초등 ${g}학년` : `중학 한자 (중${g - 6})` }
+
 function partQuestions(part, wrong) {
   let keys = [], make
   if (part.t === 'kanji') {
     const maxGrade = Math.max(...part.grades)
-    const pool = Object.keys(KANJI).filter(c => part.grades.includes(KANJI[c].grade))
+    let pool = Object.keys(KANJI).filter(c => part.grades.includes(KANJI[c].grade))
+    if (!pool.length) pool = Object.keys(KANJI).filter(c => KANJI[c].grade >= 4 && KANJI[c].grade <= 6)   // 중학 한자가 아직 없을 때
     keys = pool.flatMap(c => [`m:${c}`, ...readIndexes(c, maxGrade).map(i => `r:${c}:${i}`)])
     make = k => { const q = k.startsWith('r:') ? makeReadQuestion(k, pool) : makeMeaningQuestion(k, pool); q.mode = 'kanji'; return q }
     return pickKeys(wrong.kanji, keys).slice(0, part.n).map(make)
