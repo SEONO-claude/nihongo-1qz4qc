@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>일본어 첫걸음</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="일본어">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#fafafa">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@400;600&family=Nanum+Pen+Script&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <button class="brand" data-go="home"><span class="mark" lang="ja">日本語</span>첫걸음</button>
+  <nav>
+    <button data-go="kanji">한자</button>
+    <button data-go="cards">단어 카드</button>
+    <button data-go="conj">동사 변화표</button>
+    <button data-go="quiz">퀴즈</button>
+  </nav>
+</header>
+<main id="app"></main>
+
+<script src="data/words.js"></script>
+<script src="data/adjectives.js"></script>
+<script src="data/nouns.js"></script>
+<script src="data/kanji.js"></script>
+<script src="conjugate.js"></script>
+<script src="quiz.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
