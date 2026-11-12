@@ -830,3 +830,7 @@ button.gradbadge { border: 0; cursor: pointer; font-family: var(--round); }
 .rcbox img { width: 100%; height: auto; border-radius: 10px; display: block; }
 .rcbox p { margin: 10px 0 4px; font-size: 13px; color: var(--ink-2); }
 .sp-auto { display: flex; align-items: flex-start; gap: 8px; margin: 8px 0 0; font-size: 13px; color: var(--ink-2); line-height: 1.4; } .sp-auto input { width: 18px; height: 18px; margin: 1px 0 0; accent-color: var(--pink); flex: none; }
+/* 왼쪽 위: 고양이 발바닥 마크 (누르면 꾹 눌리는 젤리) */
+.brand .mark.paw svg { width: 22px; height: 22px; fill: #fff; transition: transform 200ms var(--spring); }
+.brand:active .mark.paw svg { transform: scale(0.82); }
+@media (hover: hover) { .brand:hover .mark.paw svg { transform: rotate(-10deg) scale(1.08); } }
