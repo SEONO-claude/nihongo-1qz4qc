@@ -263,14 +263,9 @@ main.wide { max-width: 1040px; }
 .maru { position: absolute; inset: -4px -8px; width: calc(100% + 16px); height: calc(100% + 8px); fill: none; stroke: var(--pen); stroke-width: 2.4; stroke-linecap: round; vector-effect: non-scaling-stroke; pointer-events: none; }
 .maru path { stroke-dasharray: 1; stroke-dashoffset: 1; animation: draw 360ms var(--ease) forwards; }
 
-/* 정답·오답 알림 (화면 아래에서 올라옴). 알림이 있을 때는 아래 여백을 늘려 보기가 가려지지 않게 한다 */
-main:has(.feedback) { padding-bottom: 160px; }
-.feedback {
-  position: fixed; left: 0; right: 0; bottom: 0; z-index: 30;
-  padding: 16px max(16px, env(safe-area-inset-left, 0px)) calc(16px + env(safe-area-inset-bottom, 0px));
-  border-top: 2px solid; animation: sheetUp 360ms var(--spring) both;
-}
-.feedback .in { max-width: 640px; margin: 0 auto; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+/* 정답·오답 알림: 보기 바로 아래에 붙는다 (아이폰 Safari 주소창에 가리지 않게 화면 아래 고정은 쓰지 않음) */
+.feedback { margin: 0 14px 14px; padding: 12px 14px; border: 2px solid; border-radius: 16px; animation: sheetUp 360ms var(--spring) both; }
+.feedback .in { display: flex; align-items: center; gap: 12px; }
 .feedback.good { background: var(--leaf-t); border-color: var(--leaf); }
 .feedback.bad { background: var(--bad-t); border-color: var(--bad); }
 .feedback .fmascot { width: 56px; height: 56px; flex: none; }
@@ -369,7 +364,7 @@ main.homewide { max-width: 900px; }
 @keyframes bounce { 0% { transform: scale(1); } 35% { transform: scale(1.08) translateY(-4px); } 100% { transform: scale(1); } }
 @keyframes shake { 0%, 100% { transform: translateX(0); } 20% { transform: translateX(-8px); } 40% { transform: translateX(8px); } 60% { transform: translateX(-5px); } 80% { transform: translateX(5px); } }
 @keyframes hop { 0%, 100% { transform: translateY(0) scaleY(1); } 12% { transform: translateY(0) scaleY(0.94); } 30% { transform: translateY(-10%) scaleY(1.03); } 48% { transform: translateY(0) scaleY(0.97); } 60% { transform: translateY(0) scaleY(1); } }
-@keyframes sheetUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+@keyframes sheetUp { from { transform: translateY(16px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 @keyframes stampIn { 0% { transform: rotate(var(--r)) scale(2.4); opacity: 0; } 60% { transform: rotate(var(--r)) scale(0.9); opacity: 1; } 100% { transform: rotate(var(--r)) scale(1); opacity: 0.9; } }
 @keyframes burst { 0% { transform: translate(0, 0) rotate(0); opacity: 1; } 100% { transform: translate(var(--dx), var(--dy)) rotate(var(--rot)); opacity: 0; } }
 @keyframes floatUp { 0% { transform: translate(-50%, 0) scale(0.6); opacity: 0; } 20% { transform: translate(-50%, -10px) scale(1.15); opacity: 1; } 100% { transform: translate(-50%, -70px) scale(1); opacity: 0; } }
@@ -427,8 +422,9 @@ main.homewide { max-width: 900px; }
   .q .masu-row.sm .masu { width: 56px; height: 56px; font-size: 38px; }
   .q .masu-row.sm .furi { height: 18px; font-size: 12px; line-height: 18px; }
   .q .masu.xl { width: 104px; height: 104px; font-size: 74px; }
-  .feedback { padding-top: 12px; padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px)); }
-  .feedback .in { flex-wrap: nowrap; }
+  .choice.long { font-size: 16px; }
+  .choice.xlong { font-size: 14px; letter-spacing: -0.02em; }
+  .feedback { padding: 10px 12px; }
   .feedback .ftext { min-width: 0; }
   .feedback b { font-size: 19px; }
   .feedback span { font-size: 13px; }

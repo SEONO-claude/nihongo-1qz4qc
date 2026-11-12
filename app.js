@@ -45,11 +45,30 @@ function addXP(n, x, y) {
 
 // ───── 효과음 (기기 안에서 바로 만듦, 인터넷 필요 없음) ─────
 let audioCtx = null
+// 아이폰: 무음 모드에서도 앱 효과음이 나게 'playback'으로 설정 (효과음 버튼으로 끌 수 있음).
+// 아이폰은 사용자가 화면을 처음 누를 때 소리를 켜 줘야 해서, 첫 터치에 소리 없는 소리를 한 번 낸다.
+function audio() {
+  if (!audioCtx) {
+    try { if (navigator.audioSession) navigator.audioSession.type = 'playback' } catch { /* 지원 안 함 */ }
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)()
+  }
+  if (audioCtx.state !== 'running') audioCtx.resume().catch(() => {})
+  return audioCtx
+}
+function unlockAudio() {
+  if (!progress.sound) return
+  try {
+    const c = audio(), b = c.createBuffer(1, 1, 22050), s = c.createBufferSource()
+    s.buffer = b; s.connect(c.destination); s.start(0)
+  } catch { /* 소리를 낼 수 없는 기기 */ }
+}
+for (const ev of ['touchend', 'pointerdown', 'keydown']) document.addEventListener(ev, unlockAudio, { once: true, passive: true, capture: true })
+
 function tone(freqs, { dur = 0.13, type = 'triangle', gap = 0.09, vol = 0.16 } = {}) {
   if (!progress.sound) return
   try {
-    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)()
-    const t0 = audioCtx.currentTime + 0.01
+    audio()
+    const t0 = audioCtx.currentTime + 0.02
     freqs.forEach((f, i) => {
       const o = audioCtx.createOscillator(), g = audioCtx.createGain()
       const s = t0 + i * gap
@@ -543,6 +562,10 @@ function quizView() {
     let cls = 'choice'
     if (answered && c.ok) cls += ' ok'
     else if (answered && i === qz.picked) cls += ' miss'
+    // 긴 보기(気をつけませんでした 등)는 글자를 줄여 한 줄에 넣는다
+    const len = c.html.replace(/<rt>.*?<\/rt>/g, '').replace(/<[^>]+>/g, '').length
+    if (len >= 9) cls += ' long'
+    if (len >= 11) cls += ' xlong'
     return `<button class="${cls}" data-pick="${i}" ${c.ko ? '' : 'lang="ja"'} ${answered ? 'disabled' : ''}>${c.html}${answered && c.ok ? maruSVG() : ''}</button>`
   }).join('')
   const mood = !answered ? 'think' : ok ? 'cheer' : 'sad'
@@ -561,7 +584,8 @@ function quizView() {
     <div class="qhead">${mascot(mood)}<div class="bubble" ${answered ? '' : 'aria-live="polite"'}>${say}</div></div>
     <div class="q">${q.head}</div>
     <div class="choices">${buttons}</div>
-  </div>${sheet}`
+    ${sheet}
+  </div>`
 }
 
 function quizDoneView() {
