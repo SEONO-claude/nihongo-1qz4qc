@@ -834,3 +834,16 @@ button.gradbadge { border: 0; cursor: pointer; font-family: var(--round); }
 .brand .mark.paw svg { width: 22px; height: 22px; fill: #fff; transition: transform 200ms var(--spring); }
 .brand:active .mark.paw svg { transform: scale(0.82); }
 @media (hover: hover) { .brand:hover .mark.paw svg { transform: rotate(-10deg) scale(1.08); } }
+
+/* ───── 단짝 고양이 더 살리기 ───── */
+button.hero-mascot { border: 0; background: none; padding: 0; cursor: pointer; font: inherit; text-align: left; }
+.hero-mascot.hop { animation: catBounce 900ms var(--spring) both; }
+@keyframes catBounce { 0% { transform: translateY(0) scale(1); } 25% { transform: translateY(-22%) scale(1.06, 0.94); } 55% { transform: translateY(0) scale(0.94, 1.06); } 75% { transform: translateY(-6%); } 100% { transform: none; } }
+.op-hanko .pawsvg { width: 40px; height: 40px; fill: #fff9f0; }
+.fixcard { padding: 14px 18px 16px; }
+.fixhead { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+.fixhead .fixcat { width: 56px; height: 56px; flex: none; }
+.fixhead b { display: block; font-family: var(--round); font-size: 18px; font-weight: 400; }
+.fixpair { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.fixvs { font-family: var(--round); font-size: 13px; color: var(--ink-3); }
+.fixdiff { margin: 10px 0 0; padding: 10px 12px; border-radius: 12px; background: var(--raised); font-size: 14px; line-height: 1.6; color: var(--ink-2); }

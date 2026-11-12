@@ -511,7 +511,7 @@ function homeView() {
   return `
   <section class="hero">
     <img class="hero-img" src="${IMAGES.home}" alt="화창한 아침 교실, 창밖의 벚꽃과 책상 위의 한자 연습장" width="1600" height="905" fetchpriority="high">
-    <div class="hero-mascot">${mascot('mascot', '')}<span class="says">${hello}</span></div>
+    <button class="hero-mascot${state.catHop ? ' hop' : ''}" data-act="petCat" aria-label="${buddy().name} 쓰다듬기">${mascot(state.catHop ? 'cheer' : 'mascot', '')}<span class="says">${state.catSay || hello}</span></button>
     <div class="hero-text">
       <span class="hero-date">${date} ${weekday}</span>
       <span class="lvchip"><b class="num">Lv.${playerLevel()}</b>${rankName()}</span>
@@ -525,6 +525,7 @@ function homeView() {
   </section>
   ${nextGoal}
   <div class="homegrid">${todayKanji}${stampCard}</div>
+  ${correctionCardHTML()}
   ${missionsHTML(t, goal)}
   <div class="homegrid">${reviewCardHTML()}${mockCardHTML()}</div>
   <div class="panel">
@@ -903,6 +904,36 @@ function grammarView() {
   <div class="panel glist">${items}${empty}</div>`
 }
 
+// ───── 단짝 고양이 ─────
+// 쓰다듬으면 하는 말 (성격마다 조금씩 다르게)
+const CAT_LINES = {
+  mike: ['헷갈리는 건 내가 기억해 둘게요', '한 교시만 하고 가요', '어제 틀린 거, 오늘은 맞힐 거예요', '같이 하면 금방이에요'],
+  kuro: ['흥, 오늘도 왔네요', '틀린 문제는 다 적어 뒀어요', '조금만 더 하면 별 세 개예요'],
+  shiro: ['천천히 해도 괜찮아요', '오늘 공부, 반짝반짝 빛났어요', '쉬었다 가도 돼요'],
+  mikan: ['한 판 더 가요', '정답 맞히면 점프할 거예요', '오늘 기운 넘쳐요'],
+  moka: ['헷갈리는 짝부터 정리해 봐요', '오늘은 복습부터 어때요', '차분히 하나씩요'],
+  hachi: ['달려 볼까요', '연속 정답 기록 깨 봐요', '준비 운동은 끝났어요'],
+  gin: ['조용히, 꾸준히', '한 문제씩 쌓이고 있어요', '오늘도 수고했어요'],
+  tora: ['어려운 것도 덤벼 봐요', '틀려도 다시 하면 돼요', '오늘은 몇 개 맞힐까요'],
+  maru: ['조금만 하고 같이 쉬어요', '동글동글, 오늘도 한 교시', '졸리면 문제 하나만요'],
+  sabi: ['저, 저기… 같이 공부해요', '조용히 응원하고 있어요', '오늘도 와 줘서 고마워요'],
+  mofu: ['폭신하게 시작해 봐요', '천천히 와도 기다릴게요', '오늘 배운 거 꼭 안아 둘게요'],
+}
+// 오늘의 교정: 날마다 헷갈리는 문법 짝 하나를 단짝이 짚어 준다
+function correctionCardHTML() {
+  const open = GRAMMAR.filter(g => isOpen('grammar', g.level) && g.diff && (g.similar || []).some(id => { const x = GRAMMAR.find(y => y.id === id); return x && isOpen('grammar', x.level) }))
+  if (!open.length) return ''
+  const d = todayStr(), seed = [...d].reduce((n, ch) => (n * 37 + ch.charCodeAt(0)) % 100019, 11)
+  const g = open[seed % open.length]
+  const sims = g.similar.map(id => GRAMMAR.find(y => y.id === id)).filter(x => x && isOpen('grammar', x.level)).slice(0, 2)
+  const b = buddy()
+  return `<div class="panel fixcard">
+    <div class="fixhead">${mascot('think', 'fixcat')}<div><div class="eyebrow">${b.name}의 오늘의 교정</div><b>이 둘, 헷갈리지 않나요</b></div></div>
+    <div class="fixpair"><button class="gsimbtn" data-act="grammarJump" data-id="${g.id}"><span lang="ja">${furi(g.pattern)}</span><small>${g.level} · ${g.meaning}</small></button>
+      ${sims.map(x => `<span class="fixvs">vs</span><button class="gsimbtn" data-act="grammarJump" data-id="${x.id}"><span lang="ja">${furi(x.pattern)}</span><small>${x.level} · ${x.meaning}</small></button>`).join('')}</div>
+    <p class="fixdiff">${g.diff}</p></div>`
+}
+
 // ───── 성취감: 오늘의 미션 · 복습 · 모의고사 · 성적표 ─────
 const MISSIONS = [
   { id: 'cards10', label: '단어 카드 10장 보기', need: 10, get: t => t.cards, c: 'var(--sky)' },
@@ -1067,6 +1098,7 @@ function talkView() {
 }
 
 // ───── 퀘스트 지도 ─────
+const PAW = '<svg class="pawsvg" viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="15.6" rx="5.2" ry="4.3"/><ellipse cx="5.9" cy="10.2" rx="2.1" ry="2.5" transform="rotate(-18 5.9 10.2)"/><ellipse cx="9.7" cy="6.6" rx="2.2" ry="2.7" transform="rotate(-6 9.7 6.6)"/><ellipse cx="14.3" cy="6.6" rx="2.2" ry="2.7" transform="rotate(6 14.3 6.6)"/><ellipse cx="18.1" cy="10.2" rx="2.1" ry="2.5" transform="rotate(18 18.1 10.2)"/></svg>'
 const LOCK = '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 11V7a5 5 0 0 1 10 0v4 M5 11h14v10H5z"/></svg>'
 function starsHTML(n) { return `<span class="stars" aria-label="별 ${n}개">${[1, 2, 3].map(k => `<i class="${k <= n ? 'on' : ''}">★</i>`).join('')}</span>` }
 
@@ -1431,6 +1463,15 @@ const ACTIONS = {
   quizMode(btn) { state.quizMode = btn.dataset.mode; newQuiz() },
   quizGrade(btn) { state.quizGrade = Number(btn.dataset.grade); newQuiz() },
   restartQuiz() { newQuiz() },
+  petCat() {
+    const b = buddy(), lines = CAT_LINES[b.id] || CAT_LINES.mike
+    let say; do { say = pickOne(lines) } while (lines.length > 1 && say === state.catSay)
+    state.catSay = say; state.catHop = true
+    SFX.tap(); render()
+    clearTimeout(state.catHopTimer)
+    state.catHopTimer = setTimeout(() => { state.catHop = false; if (state.view === 'home') render() }, 1400)
+    return true
+  },
   startReview() { state.quizMode = 'review'; state.view = 'quiz'; newQuiz(); render(); window.scrollTo(0, 0); return true },
   startMock(btn) { if (!isOpen('grammar', btn.dataset.level)) return true; state.mockLevel = btn.dataset.level; state.quizMode = 'mock'; state.view = 'quiz'; newQuiz(); render(); window.scrollTo(0, 0); return true },
   openChest(btn) {
@@ -1631,7 +1672,7 @@ function showOpening() {
         <svg class="op-guide" viewBox="0 0 100 100" aria-hidden="true"><path d="M50 4V96" pathLength="1"/><path d="M4 50H96" pathLength="1"/></svg>
         <img class="op-mascot" src="${catImage(buddy())}" alt="" width="320" height="320">
       </div>
-      <span class="op-hanko" lang="ja">日</span>
+      <span class="op-hanko">${PAW}</span>
     </div>
     <h1 class="op-title">${[...title].map((c, i) => c === ' ' ? '<span class="sp"> </span>' : `<span style="--i:${i}">${c}</span>`).join('')}</h1>
     <p class="op-sub"><span class="lvchip"><b class="num">Lv.${playerLevel()}</b>${rankName()}</span>${s >= 2 ? `<span class="op-streak">${s}일 연속</span>` : ''}</p>
