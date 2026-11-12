@@ -13,6 +13,7 @@
   --leaf: #4cc27a; --leaf-d: #2f9d5a; --leaf-t: #e2f7e9;
   --sun: #ffc23c; --sun-d: #e0a114; --sun-t: #fff3d1;
   --bad: #ff5d63; --bad-d: #d9434a; --bad-t: #ffe5e6;
+  --mint: #1fbfa8; --mint-d: #12977f; --mint-t: #dcf7f2;
   --acc: var(--sky); --acc-d: var(--sky-d); --acc-t: var(--sky-t);
   --btn-bg: var(--acc); --btn-ink: #ffffff;
   --shadow: rgba(80, 60, 30, 0.08);
@@ -30,7 +31,7 @@
     --line: #3a3546; --edge: #15131b;
     --cell: rgba(245, 242, 250, 0.28); --guide: rgba(245, 242, 250, 0.16);
     --pen: #ff7466; --pen-tint: rgba(255, 116, 102, 0.14);
-    --pink-t: #4a2534; --sky-t: #1d3550; --leaf-t: #1f3d2b; --sun-t: #463717; --bad-t: #4a2226;
+    --pink-t: #4a2534; --sky-t: #1d3550; --leaf-t: #1f3d2b; --sun-t: #463717; --bad-t: #4a2226; --mint-t: #173f3a;
     --shadow: rgba(0, 0, 0, 0.35);
     color-scheme: dark;
   }
@@ -41,7 +42,7 @@
   --line: #3a3546; --edge: #15131b;
   --cell: rgba(245, 242, 250, 0.28); --guide: rgba(245, 242, 250, 0.16);
   --pen: #ff7466; --pen-tint: rgba(255, 116, 102, 0.14);
-  --pink-t: #4a2534; --sky-t: #1d3550; --leaf-t: #1f3d2b; --sun-t: #463717; --bad-t: #4a2226;
+  --pink-t: #4a2534; --sky-t: #1d3550; --leaf-t: #1f3d2b; --sun-t: #463717; --bad-t: #4a2226; --mint-t: #173f3a;
   --shadow: rgba(0, 0, 0, 0.35);
   color-scheme: dark;
 }
@@ -52,6 +53,7 @@ main[data-view="cards"] { --acc: var(--sky); --acc-d: var(--sky-d); --acc-t: var
 main[data-view="conj"] { --acc: var(--leaf); --acc-d: var(--leaf-d); --acc-t: var(--leaf-t); }
 main[data-view="quiz"] { --acc: var(--sun); --acc-d: var(--sun-d); --acc-t: var(--sun-t); }
 main[data-view="home"] { --acc: var(--pink); --acc-d: var(--pink-d); --acc-t: var(--pink-t); }
+main[data-view="grammar"] { --acc: var(--mint); --acc-d: var(--mint-d); --acc-t: var(--mint-t); }
 
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.6 var(--sans); -webkit-tap-highlight-color: transparent; }
@@ -83,6 +85,8 @@ rt { color: var(--ink-3); font-size: max(0.5em, 11px); font-family: var(--jp); }
 .top nav button[data-go="cards"] { --c: var(--sky); --ct: var(--sky-t); }
 .top nav button[data-go="conj"] { --c: var(--leaf); --ct: var(--leaf-t); }
 .top nav button[data-go="quiz"] { --c: var(--sun); --ct: var(--sun-t); }
+.top nav button[data-go="grammar"] { --c: var(--mint); --ct: var(--mint-t); }
+.top nav .s { display: none; }
 .top nav button:hover { background: var(--raised); color: var(--ink); }
 .top nav button.on { background: var(--ct); border-color: var(--c); color: var(--ink); }
 .xpbadge { display: inline-flex; align-items: center; gap: 4px; height: 34px; padding: 0 12px; border-radius: 999px; background: var(--sun-t); color: var(--ink); font-family: var(--round); font-size: 15px; }
@@ -227,6 +231,34 @@ main.wide { max-width: 1040px; }
 .alltable td { font-size: 17px; line-height: 2; white-space: nowrap; }
 .alltable .end { color: var(--ink-3); }
 .alltable tbody tr:last-child th, .alltable tbody tr:last-child td { border-bottom: 0; }
+
+/* ───── JLPT 문법 ───── */
+.ghero { display: flex; align-items: center; gap: 12px; padding: 16px 20px; margin-bottom: 16px; border-radius: 20px; background: var(--mint-t); border: 2px solid var(--line); border-bottom-width: 4px; }
+.ghero .mascot { width: 72px; height: 72px; flex: none; }
+.ghero h1 { margin: 0; font-family: var(--round); font-size: 26px; font-weight: 400; }
+.ghero p { margin: 2px 0 0; font-size: 14px; color: var(--ink-2); }
+.gtabs button .num { margin-left: 4px; font-size: 12px; color: var(--ink-3); font-family: var(--sans); }
+.glist { overflow: hidden; }
+.gitem { border-bottom: 2px solid var(--line); }
+.gitem:last-child { border-bottom: 0; }
+.ghead { width: 100%; display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 2px 12px; padding: 14px 20px; border: 0; background: none; text-align: left; transition: background-color 150ms var(--ease); }
+.ghead:hover { background: var(--raised); }
+.gitem.open .ghead { background: var(--mint-t); }
+.gpattern { font-size: 19px; line-height: 2; color: var(--ink); }
+.gpattern rt, .gex rt { font-size: 10px; }
+.gmean { grid-column: 1; font-size: 14px; color: var(--ink-2); }
+.glevel { grid-column: 2; grid-row: 1 / span 2; padding: 2px 8px; border-radius: 999px; background: var(--mint-t); color: var(--mint-d); font-family: var(--round); font-size: 13px; }
+.gitem.seen .gpattern::after { content: ""; display: inline-block; width: 8px; height: 8px; margin-left: 8px; border-radius: 50%; background: var(--mint); vertical-align: middle; }
+.gbody { padding: 4px 20px 18px; display: flex; flex-direction: column; gap: 10px; animation: popIn 260ms var(--ease) both; background: var(--mint-t); }
+.gconnect { font-size: 14px; color: var(--ink); } .gconnect b { margin-right: 8px; padding: 2px 8px; border-radius: 8px; background: var(--card); color: var(--mint-d); font-weight: 600; font-size: 12px; }
+.gexplain { margin: 0; font-size: 14px; color: var(--ink-2); }
+.gex { padding: 10px 14px; border-radius: 14px; background: var(--card); border: 2px solid var(--line); }
+.gex .jp { display: block; font-size: 17px; line-height: 2.1; }
+.gex .ko { display: block; font-size: 13px; color: var(--ink-2); }
+.gstar { align-self: flex-start; height: 40px; font-size: 15px; }
+.gstar.on { background: var(--sun-t); border-color: var(--sun-d); color: var(--sun-d); }
+.gempty { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 28px 20px; text-align: center; color: var(--ink-2); }
+.gempty .mascot { width: 96px; height: 96px; }
 
 /* ───── 퀴즈 ─────
    폰 한 화면 안에 다 들어오게: 설정 한 줄, 진행 막대, 미케+질문, 2×2 보기, 아래 알림창 */
@@ -392,6 +424,10 @@ main.homewide { max-width: 900px; }
   .banner-text p { font-size: 12px; }
   .homegrid { grid-template-columns: 1fr; }
 }
+@media (max-width: 900px) {
+  .top nav .l { display: none; }
+  .top nav .s { display: inline; }
+}
 @media (max-width: 760px) {
   .brand { order: 1; }
   .topright { order: 2; }
@@ -401,7 +437,9 @@ main.homewide { max-width: 900px; }
   .top { padding: 8px 12px; }
   .xpbadge { height: 30px; font-size: 14px; }
   .soundbtn { width: 34px; height: 34px; }
-  .top nav button { padding: 0 8px; font-size: 15px; }
+  .top nav button { padding: 0 7px; gap: 5px; font-size: 15px; }
+  .top nav button::before { width: 8px; height: 8px; }
+  .gtabs button { padding: 0 10px; }
   main { padding-top: 20px; }
   .masu-row.lg .masu { width: 68px; height: 68px; font-size: 46px; }
   th, td { padding: 8px 12px; }

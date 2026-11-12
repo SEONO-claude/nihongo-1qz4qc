@@ -1,6 +1,6 @@
 // ───── 진도 저장 (localStorage) ─────
 const STORE_KEY = 'jp-study-progress'
-const EMPTY = { seen: {}, seenKanji: [], learnedForms: [], wrong: [], learnedKanji: [], wrongKanji: [], lastStudy: '', studyDays: [], today: { date: '', cards: 0, quizzes: 0, xp: 0 }, xp: 0, sound: true }
+const EMPTY = { seen: {}, seenKanji: [], learnedForms: [], wrong: [], learnedKanji: [], wrongKanji: [], lastStudy: '', studyDays: [], today: { date: '', cards: 0, quizzes: 0, xp: 0 }, xp: 0, sound: true, savedGrammar: [], seenGrammar: [] }
 
 function loadProgress() {
   try { return { ...EMPTY, ...JSON.parse(localStorage.getItem(STORE_KEY) || '{}') } }
@@ -144,7 +144,7 @@ const pickOne = list => list[Math.floor(Math.random() * list.length)]
 
 // ───── 공통 ─────
 const app = document.getElementById('app')
-const state = { view: 'home', cardType: 'verb', cardIdx: { verb: 0, adj: 0, noun: 0 }, verb: 0, kanji: null, quiz: null, grade: 1, conjMode: 'one', conjGroup: 0, quizMode: 'verb', quizGrade: 0 }
+const state = { view: 'home', cardType: 'verb', cardIdx: { verb: 0, adj: 0, noun: 0 }, verb: 0, kanji: null, quiz: null, grade: 1, conjMode: 'one', conjGroup: 0, quizMode: 'verb', quizGrade: 0, grammarLevel: 'N5', grammarOpen: null }
 
 function newQuiz() {
   const list = state.quizMode === 'kanji'
@@ -332,6 +332,7 @@ function homeView() {
     ${bar('명사 카드', seenCount('noun'), NOUNS.length)}
     ${bar('맞힌 동사 형태', progress.learnedForms.length, formTotal)}
     ${bar('맞힌 한자 문제', progress.learnedKanji.length, kanjiQ)}
+    ${bar('본 JLPT 문법', progress.seenGrammar.filter(id => GRAMMAR.some(g => g.id === id)).length, GRAMMAR.length)}
     <div class="row"><div class="label">다시 볼 문제<span class="num${wrong ? ' key' : ''}">${wrong}개</span></div></div>
   </div>
   ${offlineReady ? '<p class="sub offline">인터넷 없이도 열 수 있어요</p>' : ''}`
@@ -533,6 +534,47 @@ function conjOneView() {
   </div>`
 }
 
+// ───── JLPT 문법 ─────
+// {漢字|かんじ} → 후리가나
+function furi(s) {
+  return s.replace(/\{([^{}|]+)\|([^{}|]+)\}/g, '<ruby>$1<rt>$2</rt></ruby>')
+}
+const LEVELS = ['N5', 'N4', 'N3', 'N2', 'N1']
+
+function grammarView() {
+  const saved = progress.savedGrammar.filter(id => GRAMMAR.some(g => g.id === id))
+  const lv = state.grammarLevel
+  const tabs = [...LEVELS, 'saved'].map(l => {
+    const n = l === 'saved' ? saved.length : GRAMMAR.filter(g => g.level === l).length
+    return `<button class="${lv === l ? 'on' : ''}" data-act="grammarLevel" data-level="${l}">${l === 'saved' ? '★ 저장' : l}<span class="num">${n}</span></button>`
+  }).join('')
+  const list = lv === 'saved' ? GRAMMAR.filter(g => saved.includes(g.id)) : GRAMMAR.filter(g => g.level === lv)
+  const seen = list.filter(g => progress.seenGrammar.includes(g.id)).length
+  const items = list.map(g => {
+    const open = state.grammarOpen === g.id, star = saved.includes(g.id)
+    return `<div class="gitem${open ? ' open' : ''}${progress.seenGrammar.includes(g.id) ? ' seen' : ''}">
+      <button class="ghead" data-act="grammarOpen" data-id="${g.id}" aria-expanded="${open}">
+        <span class="gpattern" lang="ja">${furi(g.pattern)}</span>
+        <span class="gmean">${g.meaning}</span>
+        ${lv === 'saved' ? `<span class="glevel">${g.level}</span>` : ''}
+      </button>
+      ${open ? `<div class="gbody">
+        <div class="gconnect"><b>접속</b>${g.connect}</div>
+        <p class="gexplain">${g.explain}</p>
+        ${g.examples.map(e => `<div class="gex"><span class="jp" lang="ja">${furi(e.jp)}</span><span class="ko">${e.ko}</span></div>`).join('')}
+        <button class="btn gstar${star ? ' on' : ''}" data-act="grammarStar" data-id="${g.id}">${star ? '★ 저장됨' : '☆ 헷갈려요, 저장'}</button>
+      </div>` : ''}
+    </div>`
+  }).join('')
+  const empty = lv === 'saved' && !list.length
+    ? `<div class="gempty">${mascot('think')}<p>헷갈리는 문법에서 <b>☆ 저장</b>을 누르면 여기에 모여요</p></div>` : ''
+  return `
+  <div class="ghero">${mascot('mascot')}<div><h1>JLPT 문법</h1><p>N5 기초부터 N1 핵심까지 · 헷갈리는 건 저장해 두고 다시 봐요</p></div></div>
+  <div class="tabs gtabs">${tabs}</div>
+  ${lv !== 'saved' && list.length ? `<p class="sub">${lv} 문법 ${list.length}개 · 본 문법 <span class="num">${seen} / ${list.length}</span></p>` : ''}
+  <div class="panel glist">${items}${empty}</div>`
+}
+
 // ───── 퀴즈 ─────
 function quizHeader() {
   const modes = [['verb', '동사 변화'], ['kanji', '한자']]
@@ -652,12 +694,25 @@ function pick(i) {
 }
 
 // ───── 이벤트 ─────
-const VIEWS = { home: homeView, kanji: kanjiView, cards: cardsView, conj: conjView, quiz: quizView }
+const VIEWS = { home: homeView, kanji: kanjiView, cards: cardsView, conj: conjView, grammar: grammarView, quiz: quizView }
 
 const ACTIONS = {
   prevCard() { state.cardIdx[state.cardType]--; state.kanji = null; state.slide = 'prev'; markSeen(); SFX.tap() },
   nextCard() { state.cardIdx[state.cardType]++; state.kanji = null; state.slide = 'next'; markSeen(); SFX.tap() },
   sound() { progress.sound = !progress.sound; saveProgress(); updateTop(); SFX.tap(); return true },
+  grammarLevel(btn) { state.grammarLevel = btn.dataset.level; state.grammarOpen = null },
+  grammarOpen(btn) {
+    const id = btn.dataset.id
+    state.grammarOpen = state.grammarOpen === id ? null : id
+    if (state.grammarOpen && !progress.seenGrammar.includes(id)) { progress.seenGrammar.push(id); addXP(2) }
+    SFX.tap()
+  },
+  grammarStar(btn) {
+    const id = btn.dataset.id, s = progress.savedGrammar
+    progress.savedGrammar = s.includes(id) ? s.filter(x => x !== id) : [...s, id]
+    saveProgress()
+    if (progress.savedGrammar.includes(id)) { const [x, y] = centerOf(btn); confetti(x, y, 10); SFX.good() }
+  },
   showConj() { state.verb = state.cardIdx.verb; state.conjMode = 'one'; go('conj'); return true },
   cardType(btn) { state.cardType = btn.dataset.type; state.kanji = null; markSeen() },
   prevVerb() { state.verb-- },

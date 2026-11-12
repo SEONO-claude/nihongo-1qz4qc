@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>아이폰 16 Pro 미리보기</title>
+<style>
+  /* 앱을 아이폰 16 Pro 화면 크기(402×874)로 보여 주는 미리보기. 창 크기에 맞춰 통째로 줄인다 */
+  html, body { margin: 0; height: 100%; background: #e9e4dc; font-family: system-ui, sans-serif; }
+  .wrap { height: 100%; display: grid; place-items: center; overflow: hidden; }
+  .phone {
+    position: relative; padding: 12px; border-radius: 62px; background: #1b1b1f;
+    box-shadow: 0 0 0 2px #3a3a40, 0 30px 60px rgba(0, 0, 0, 0.25); transform-origin: center center;
+  }
+  .screen { position: relative; width: 402px; height: 874px; border-radius: 50px; overflow: hidden; background: #fff; }
+  /* 홈 화면에 추가한 앱처럼: 위 상태 표시줄(시계·배터리) 54px 아래부터 앱이 보인다 */
+  .status { height: 54px; display: flex; align-items: center; justify-content: space-between; padding: 6px 34px 0 46px; font: 600 16px system-ui, sans-serif; color: #111; background: #fff; }
+  .status i { font-style: normal; letter-spacing: 1px; font-size: 13px; }
+  iframe { width: 402px; height: 820px; border: 0; display: block; }
+  @media (prefers-color-scheme: dark) { .status { background: #26232f; color: #f5f2fa; } .screen { background: #1c1a24; } html, body { background: #2a2730; } .label { color: #b9b3c4; } }
+  .island { position: absolute; top: 11px; left: 50%; width: 124px; height: 36px; margin-left: -62px; border-radius: 20px; background: #000; z-index: 2; pointer-events: none; }
+  .label { position: fixed; left: 12px; top: 10px; font-size: 12px; color: #6b665b; }
+  .label button { margin-left: 8px; font: inherit; border: 1px solid #c9c2b6; background: #fff; border-radius: 6px; padding: 2px 8px; cursor: pointer; }
+</style>
+</head>
+<body>
+<div class="label">아이폰 16 Pro · 402×874 (홈 화면 앱 모습) <button id="reload">새로고침</button></div>
+<div class="wrap">
+  <div class="phone" id="phone">
+    <div class="screen">
+      <div class="island"></div>
+      <div class="status"><span>9:41</span><i>●●●● ▮▮</i></div>
+      <iframe id="app" src="./" title="일본어 첫걸음"></iframe>
+    </div>
+  </div>
+</div>
+<script>
+  const phone = document.getElementById('phone')
+  function fit() {
+    const s = Math.min(1, (innerHeight - 44) / 898, (innerWidth - 24) / 426)
+    phone.style.transform = `scale(${s})`
+  }
+  addEventListener('resize', fit); fit()
+  document.getElementById('reload').onclick = () => document.getElementById('app').contentWindow.location.reload()
+</script>
+</body>
+</html>
