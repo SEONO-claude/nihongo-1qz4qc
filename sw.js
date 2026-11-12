@@ -1,6 +1,6 @@
 // 오프라인용 서비스 워커: 앱 파일을 폰에 저장해 두고 인터넷 없이도 연다.
 // 인터넷이 될 때는 항상 새 파일을 받고, 그 사본을 저장해 둔다.
-const VERSION = 'v41'
+const VERSION = 'v42'
 const CACHE = `nihongo-${VERSION}`
 const FILES = [
   './',
@@ -18,6 +18,7 @@ const FILES = [
   './data/grammar.js',
   './data/talk.js',
   './data/ono.js',
+  './data/numbers.js',
   './manifest.webmanifest',
   './icons/icon-180.png',
   './icons/icon-192.png',

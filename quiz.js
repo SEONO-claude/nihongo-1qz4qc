@@ -70,13 +70,13 @@ function buildVerbQuiz(wrongKeys, level = 'all') {
 const SCHOOLS = [
   { id: 'elem', name: '초등학교', mark: '小', color: 'pink', reward: '졸업장 · 중학 한자 1110자 · 중학 동사 · N4 문법',
     stages: [
-      { id: 'e1', name: '1학년', parts: [{ t: 'kanji', grades: [1], n: 6 }, { t: 'verb', level: 'elem', n: 2 }, { t: 'grammar', levels: ['N5'], n: 2 }] },
-      { id: 'e2', name: '2학년', parts: [{ t: 'kanji', grades: [2], n: 5 }, { t: 'verb', level: 'elem', n: 3 }, { t: 'grammar', levels: ['N5'], n: 2 }] },
-      { id: 'e3', name: '3학년', parts: [{ t: 'kanji', grades: [3], n: 5 }, { t: 'verb', level: 'elem', n: 3 }, { t: 'grammar', levels: ['N5'], n: 2 }] },
-      { id: 'e4', name: '4학년', parts: [{ t: 'kanji', grades: [4], n: 4 }, { t: 'verb', level: 'elem', n: 3 }, { t: 'grammar', levels: ['N5'], n: 3 }] },
-      { id: 'e5', name: '5학년', parts: [{ t: 'kanji', grades: [5], n: 4 }, { t: 'verb', level: 'elem', n: 3 }, { t: 'grammar', levels: ['N4'], n: 3 }] },
-      { id: 'e6', name: '6학년', parts: [{ t: 'kanji', grades: [6], n: 4 }, { t: 'verb', level: 'elem', n: 3 }, { t: 'grammar', levels: ['N4'], n: 3 }] },
-      { id: 'ef', name: '졸업 시험', boss: true, parts: [{ t: 'kanji', grades: [1, 2, 3, 4, 5, 6], n: 8 }, { t: 'verb', level: 'elem', n: 6 }, { t: 'grammar', levels: ['N5', 'N4'], n: 6 }] },
+      { id: 'e1', name: '1학년', parts: [{ t: 'kanji', grades: [1], n: 5 }, { t: 'num', groups: ['tsu', 'nin'], n: 2 }, { t: 'verb', level: 'elem', n: 1 }, { t: 'grammar', levels: ['N5'], n: 2 }] },
+      { id: 'e2', name: '2학년', parts: [{ t: 'kanji', grades: [2], n: 4 }, { t: 'num', groups: ['ka'], n: 2 }, { t: 'verb', level: 'elem', n: 2 }, { t: 'grammar', levels: ['N5'], n: 2 }] },
+      { id: 'e3', name: '3학년', parts: [{ t: 'kanji', grades: [3], n: 4 }, { t: 'num', groups: ['gatsu', 'ji'], n: 2 }, { t: 'verb', level: 'elem', n: 2 }, { t: 'grammar', levels: ['N5'], n: 2 }] },
+      { id: 'e4', name: '4학년', parts: [{ t: 'kanji', grades: [4], n: 3 }, { t: 'num', groups: ['hon', 'hiki'], n: 2 }, { t: 'verb', level: 'elem', n: 2 }, { t: 'grammar', levels: ['N5'], n: 3 }] },
+      { id: 'e5', name: '5학년', parts: [{ t: 'kanji', grades: [5], n: 3 }, { t: 'num', groups: ['kai', 'big'], n: 2 }, { t: 'verb', level: 'elem', n: 2 }, { t: 'grammar', levels: ['N4'], n: 3 }] },
+      { id: 'e6', name: '6학년', parts: [{ t: 'kanji', grades: [6], n: 3 }, { t: 'num', groups: ['etc', 'ka', 'hon'], n: 2 }, { t: 'verb', level: 'elem', n: 2 }, { t: 'grammar', levels: ['N4'], n: 3 }] },
+      { id: 'ef', name: '졸업 시험', boss: true, parts: [{ t: 'kanji', grades: [1, 2, 3, 4, 5, 6], n: 7 }, { t: 'num', groups: 'all', n: 4 }, { t: 'verb', level: 'elem', n: 3 }, { t: 'grammar', levels: ['N5', 'N4'], n: 6 }] },
     ] },
   { id: 'mid', name: '중학교', mark: '中', color: 'sky', reward: '졸업장 · 고등 한자 · 고등 동사 · N2 문법',
     stages: [
@@ -153,6 +153,7 @@ function partQuestions(part, wrong) {
     make = k => { const q = k.startsWith('r:') ? makeReadQuestion(k, pool) : makeMeaningQuestion(k, pool); q.mode = 'kanji'; return q }
     return pickKeys(wrong.kanji, keys).slice(0, part.n).map(make)
   }
+  if (part.t === 'num') return pickKeys(wrong.kanji, numKeys(part.groups)).slice(0, part.n).map(makeNumQuestion)
   if (part.t === 'verb') {
     keys = verbKeys(part.level)
     if (!keys.length) keys = verbKeys('elem')   // 아직 그 수준 동사가 없으면 초등 동사로
@@ -470,9 +471,45 @@ function makeOnoQuestion(key) {
 }
 function buildOnoQuiz(cat, wrongKeys) { return pickKeys(wrongKeys, onoKeys(cat)).map(makeOnoQuestion) }
 
+// ───── 숫자 읽기: 날짜·개수·조수사 ─────
+// "nm:5" 낱말 → 읽기 · "nw:5" 읽기 → 낱말 (같은 묶음 낱말이 오답)
+function numById(id) { return typeof NUMBERS === 'undefined' ? null : NUMBERS.find(n => n.id === id) }
+function numGroup(id) { return NUMBER_GROUPS.find(g => g.id === id) }
+function numKeys(groups) {
+  if (typeof NUMBERS === 'undefined') return []
+  return NUMBERS.filter(n => groups === 'all' || groups.includes(n.g)).flatMap(n => [`nm:${n.id}`, `nw:${n.id}`])
+}
+function makeNumQuestion(key) {
+  const [type, id] = key.split(':')
+  const n = numById(id), grp = numGroup(n.g)
+  const okR = new Set([n.r, ...n.alt])
+  const tag = ` <span class="gqlv">${grp.name}</span>`
+  const review = `<span class="jp" lang="ja"><ruby>${n.w}<rt>${n.r}</rt></ruby></span><span class="dim">${n.m}</span>`
+  const right = `${n.w} = ${n.r}${n.alt.length ? ` (${n.alt.join('·')}도 맞아요)` : ''}`
+  const wrong = `${right} · ${grp.note}`
+  const same = NUMBERS.filter(x => x.g === n.g && x !== n)
+  if (type === 'nw') {
+    // 읽기를 보고 낱말 고르기: 오답 낱말은 그 읽기로 읽히지 않는 것만
+    const picks = [n.w]
+    for (const x of shuffle(same)) { if (picks.length >= 4) break; if (!x.alt.includes(n.r) && x.r !== n.r && !picks.includes(x.w)) picks.push(x.w) }
+    return { key, review, right, wrong, mode: 'kanji',
+      head: `<div class="gq" lang="ja">「${n.r}」</div>`, prompt: `이렇게 읽는 것은${tag}`,
+      choices: shuffle(picks.map(x => ({ html: x, ok: x === n.w }))) }
+  }
+  const picks = [n.r]
+  const add = x => { if (picks.length < 4 && x && !okR.has(x) && !picks.includes(x)) picks.push(x) }
+  shuffle(n.bad).forEach(add)
+  shuffle(same.map(x => x.r).filter(x => Math.abs(x.length - n.r.length) <= 2)).forEach(add)
+  shuffle(nearMisses(n.r)).forEach(add)
+  return { key, review, right, wrong, mode: 'kanji',
+    head: wordCells(n.w), prompt: `읽는 법은 <span class="dim">· ${n.m}</span>${tag}`,
+    choices: shuffle(picks.map(x => ({ html: x, ok: x === n.r }))) }
+}
+function buildNumQuiz(group, wrongKeys) { return pickKeys(wrongKeys, numKeys(group === 'all' ? 'all' : [group])).map(makeNumQuestion) }
+
 // ───── 문제 키 하나로 문제 다시 만들기 (복습·모의고사) ─────
 function keyMode(k) {
-  if (/^(r|m|hk):/.test(k)) return 'kanji'
+  if (/^(r|m|hk|nm|nw):/.test(k)) return 'kanji'
   if (/^g[abcfjo]:/.test(k)) return 'grammar'
   if (/^t[wmb]:/.test(k)) return 'talk'
   if (/^o[mwf]:/.test(k)) return 'ono'
@@ -483,6 +520,7 @@ function questionFromKey(k) {
     const mode = keyMode(k)
     let q
     if (k.startsWith('hk:')) q = makeHighKanjiQuestion(k)
+    else if (/^n[mw]:/.test(k)) { if (!numById(k.split(':')[1])) return null; q = makeNumQuestion(k) }
     else if (mode === 'kanji') { const c = k.split(':')[1]; if (!KANJI[c]) return null; const pool = kanjiPool(KANJI[c].grade); q = k.startsWith('r:') ? makeReadQuestion(k, pool) : makeMeaningQuestion(k, pool) }
     else if (mode === 'grammar') { if (!grammarById(k.split(':')[1])) return null; q = makeGrammarQuestion(k) }
     else if (mode === 'talk') { if (!talkScene(k.split(':')[1])) return null; q = makeTalkQuestion(k) }
@@ -497,6 +535,7 @@ function masterItem(k) {
   const p = k.split(':')
   if (/^(r|m):/.test(k)) return 'k:' + p[1]
   if (k.startsWith('hk:')) return 'h:' + p[1] + ':' + p[2]
+  if (/^n[mw]:/.test(k)) return 'n:' + p[1]
   if (/^g/.test(p[0])) return 'g:' + p[1]
   if (/^t/.test(p[0])) return 't:' + p[1] + ':' + p[2]
   if (/^o/.test(p[0])) return 'o:' + p[1]

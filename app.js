@@ -305,7 +305,7 @@ const pickOne = list => list[Math.floor(Math.random() * list.length)]
 
 // ───── 공통 ─────
 const app = document.getElementById('app')
-const state = { view: 'home', cardType: 'verb', cardIdx: { verb: 0, adj: 0, noun: 0, high: 0, ono: 0 }, verb: 0, kanji: null, quiz: null, grade: 1, conjMode: 'one', conjGroup: 0, quizMode: 'verb', quizGrade: 0, grammarLevel: 'N5', grammarOpen: null, quizLevel: 'N5', quizTab: 'quest', stage: null, verbQuizLevel: 'all', talkScene: null, talkQuiz: 'all', showCasual: false, onoQuiz: 'all', mockLevel: 'N5' }
+const state = { view: 'home', cardType: 'verb', cardIdx: { verb: 0, adj: 0, noun: 0, high: 0, ono: 0, num: 0 }, verb: 0, kanji: null, quiz: null, grade: 1, conjMode: 'one', conjGroup: 0, quizMode: 'verb', quizGrade: 0, grammarLevel: 'N5', grammarOpen: null, quizLevel: 'N5', quizTab: 'quest', stage: null, verbQuizLevel: 'all', talkScene: null, talkQuiz: 'all', showCasual: false, onoQuiz: 'all', numQuiz: 'all', mockLevel: 'N5' }
 
 // ───── 퀘스트 진행 ─────
 function stageStars(id) { return progress.stages[id] || 0 }
@@ -329,6 +329,7 @@ function newQuiz() {
     : state.quizMode === 'fix' ? buildFixQuiz()
     : state.quizMode === 'place' ? buildPlacement()
     : state.quizMode === 'mock' ? buildMock(state.mockLevel)
+    : state.quizMode === 'num' ? buildNumQuiz(state.numQuiz || 'all', progress.wrongKanji)
     : state.quizMode === 'ono' ? buildOnoQuiz(state.onoQuiz || 'all', progress.wrongOno)
     : state.quizMode === 'talk' ? buildTalkQuiz(state.talkQuiz || 'all', progress.wrongTalk)
     : state.quizMode === 'grammar' ? buildGrammarQuiz(state.quizLevel, progress.savedGrammar, progress.wrongGrammar)
@@ -724,12 +725,14 @@ const HIGH_CARDS = typeof HIGH_KANJI === 'undefined' ? [] : Object.keys(HK_SETS)
   { id: `${s}:${i}`, set: s, kanji: w, reading: r, meaning: m, ruby: splitRuby(w, r), cat: HK_SETS[s] })))
 // 의성어·의태어 카드: 가나 칸으로 보여 준다
 const ONO_CARDS = (typeof ONO === 'undefined' ? [] : ONO).map(o => ({ ...o, kanji: o.word, reading: o.word, ruby: [[o.word, '']] }))
+const NUM_CARDS = (typeof NUMBERS === 'undefined' ? [] : NUMBERS).map(n => ({ id: n.id, kanji: n.w, reading: n.r, ruby: [[n.w, n.r]], meaning: n.m, cat: numGroup(n.g).name, g: n.g, note: numGroup(n.g).note }))
 const CARD_TYPES = {
   verb: { label: '동사', list: WORDS, prefix: '' },
   adj: { label: '형용사', list: ADJECTIVES, prefix: 'a:' },
   noun: { label: '명사', list: NOUN_LIST, prefix: 'n:' },
   high: { label: '고등 한자', list: HIGH_CARDS, prefix: 'h:' },
   ono: { label: '의성어', list: ONO_CARDS, prefix: 'o:' },
+  num: { label: '숫자 읽기', list: NUM_CARDS, prefix: 'nu:' },
 }
 function cardOpen(type, x) {
   return type === 'verb' ? isOpen('verb', verbLevel(x)) : type === 'high' ? isOpen('kanji', HK_SET_GRADE[x.set]) : true
@@ -754,6 +757,10 @@ function verbOptions(selected) {
 function cardOptions() {
   const list = cardList(), sel = cardIndex()
   if (state.cardType === 'verb') return verbOptions(sel)
+  if (state.cardType === 'num') return NUMBER_GROUPS.map(g => {
+    const items = list.map((x, i) => [x, i]).filter(([x]) => x.g === g.id)
+    return items.length ? `<optgroup label="${g.name} ${items.length}개">${items.map(([x, i]) => `<option value="${i}" ${i === sel ? 'selected' : ''}>${x.kanji} (${x.reading}) · ${x.meaning}</option>`).join('')}</optgroup>` : ''
+  }).join('')
   if (state.cardType === 'ono') return ONO_CATS.map(c => {
     const items = list.map((x, i) => [x, i]).filter(([x]) => x.cat === c)
     return items.length ? `<optgroup label="${c} ${items.length}개">${items.map(([x, i]) => `<option value="${i}" ${i === sel ? 'selected' : ''}>${x.word} · ${x.meaning}</option>`).join('')}</optgroup>` : ''
@@ -826,6 +833,7 @@ function cardsView() {
       <button class="btn" data-act="prevCard" ${i === 0 ? 'disabled' : ''}>${icon('left')}이전</button>
       ${type === 'verb' ? '<button class="btn" data-act="showConj">변화표 보기</button>' : ''}
       ${type === 'ono' ? '<button class="btn" data-act="onoQuiz">퀴즈</button>' : ''}
+      ${type === 'num' ? '<button class="btn" data-act="numQuiz">퀴즈</button>' : ''}
       <button class="btn pri" data-act="nextCard" ${i === list.length - 1 ? 'disabled' : ''}>다음${icon('right')}</button>
     </div>
     ${nextLock}
@@ -1351,7 +1359,7 @@ function quizHeader() {
       <div class="stagename"><small>${sc.name}</small><b>${st.name}</b></div>
       <span class="stagegoal">${stageSize(st)}문제 중 ${passNeed(st)}개 이상</span></div>`
   }
-  const modes = [['verb', '동사'], ['kanji', '한자'], ['grammar', '문법'], ['talk', '회화'], ['ono', '의성어']]
+  const modes = [['verb', '동사'], ['kanji', '한자'], ['grammar', '문법'], ['talk', '회화'], ['num', '숫자'], ['ono', '의성어']]
     .map(([m, label]) => `<button class="${state.quizMode === m ? 'on' : ''}" data-act="quizMode" data-mode="${m}">${label}</button>`).join('')
   const back = `<button class="btn icon-only" data-act="quizTab" data-tab="quest" aria-label="퀘스트 지도로">${icon('left')}</button>`
   // 한 줄로: [←][동사 | 한자 | 문법] + 동사는 수준, 한자는 학년, 문법은 급수 고르기
@@ -1359,6 +1367,8 @@ function quizHeader() {
     ? `<select class="gradesel" data-act="verbLevelSel" aria-label="동사 수준 고르기">${['all', 'elem', 'mid', 'high'].map(l => { const lock = l !== 'all' && !isOpen('verb', l); return `<option value="${l}" ${state.verbQuizLevel === l ? 'selected' : ''}${lock ? ' disabled' : ''}>${l === 'all' ? '열린 동사 전체' : `${VERB_LEVELS[l]} 동사${lock ? ' (잠김)' : ''}`}</option>` }).join('')}</select>`
     : state.quizMode === 'kanji'
     ? `<select class="gradesel" data-act="quizGradeSel" aria-label="학년 고르기">${[0, ...kanjiGrades()].map(g => { const lock = g > 0 && !isOpen('kanji', g); return `<option value="${g}" ${state.quizGrade === g ? 'selected' : ''}${lock ? ' disabled' : ''}>${g ? (g <= 6 ? `초등 ${g}학년` : g <= 9 ? `중학 ${g - 6}묶음` : gradeLong(g)) + (lock ? ' (잠김)' : '') : '열린 한자 전체'}</option>` }).join('')}</select>`
+    : state.quizMode === 'num'
+    ? `<select class="gradesel" data-act="numQuizSel" aria-label="묶음 고르기"><option value="all">모든 숫자 읽기</option>${NUMBER_GROUPS.map(g => `<option value="${g.id}" ${state.numQuiz === g.id ? 'selected' : ''}>${g.name}</option>`).join('')}</select>`
     : state.quizMode === 'ono'
     ? `<select class="gradesel" data-act="onoQuizSel" aria-label="분류 고르기"><option value="all">모든 의성어</option>${ONO_CATS.map(c => `<option value="${c}" ${state.onoQuiz === c ? 'selected' : ''}>${c}</option>`).join('')}</select>`
     : state.quizMode === 'talk'
@@ -1668,6 +1678,7 @@ const ACTIONS = {
     return true
   },
   reportCard(btn) { showReportCard(btn.dataset.school); return true },
+  numQuiz() { const w = cardList()[cardIndex()]; state.quizMode = 'num'; state.numQuiz = w ? w.g : 'all'; state.quizTab = 'free'; go('quiz'); return true },
   onoQuiz() { const w = cardList()[cardIndex()]; state.quizMode = 'ono'; state.onoQuiz = w ? w.cat : 'all'; state.quizTab = 'free'; go('quiz'); return true },
   talkOpen(btn) { history.pushState({ v: 'talk', scene: btn.dataset.id }, ''); state.talkScene = btn.dataset.id; todayStats().scenes = (todayStats().scenes || 0) + 1; saveProgress(); SFX.tap(); window.scrollTo(0, 0) },
   talkBack() { history.back(); return true },
@@ -1754,6 +1765,7 @@ document.addEventListener('change', e => {
   if (e.target.matches('select[data-act="quizGradeSel"]')) { state.quizGrade = Number(e.target.value); newQuiz(); render() }
   if (e.target.matches('select[data-act="quizLevelSel"]')) { state.quizLevel = e.target.value; newQuiz(); render() }
   if (e.target.matches('select[data-act="onoQuizSel"]')) { state.onoQuiz = e.target.value; newQuiz(); render() }
+  if (e.target.matches('select[data-act="numQuizSel"]')) { state.numQuiz = e.target.value; newQuiz(); render() }
   if (e.target.matches('select[data-act="talkQuizSel"]')) { state.talkQuiz = e.target.value; newQuiz(); render() }
   if (e.target.matches('select[data-act="verbLevelSel"]')) { state.verbQuizLevel = e.target.value; newQuiz(); render() }
 })
