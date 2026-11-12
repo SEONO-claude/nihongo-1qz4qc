@@ -436,8 +436,6 @@ function render() {
   const navV = ['conj', 'kanji'].includes(state.view) ? 'cards' : state.view
   document.querySelectorAll('.tabbar button').forEach(b => b.classList.toggle('on', b.dataset.go === navV))
   document.body.classList.toggle('quizzing', state.view === 'quiz' && !!state.quiz && state.quiz.i < state.quiz.list.length && (SPECIAL.includes(state.quizMode) || state.quizTab === 'free') && !(state.quizMode === 'mock' && state.mockIntro))
-  app.classList.toggle('wide', state.view === 'conj' && state.conjMode === 'all')
-  app.classList.toggle('homewide', state.view === 'home')
   app.dataset.view = state.view
   app.innerHTML = VIEWS[state.view]()
   // 한 번만 보여 줄 움직임은 그린 뒤 끈다
@@ -928,11 +926,10 @@ function grammarView() {
   const lv = state.grammarLevel
   const tabs = [...LEVELS, 'saved'].map(l => {
     const n = l === 'saved' ? saved.length : GRAMMAR.filter(g => g.level === l).length
-    const open = l === 'saved' || isOpen('grammar', l)
-    return `<button class="${lv === l ? 'on' : ''}${open ? '' : ' locked'}" data-act="grammarLevel" data-level="${l}">${open ? '' : LOCK}${l === 'saved' ? '★ 저장' : l}<span class="num">${n}</span></button>`
+    return `<button class="${lv === l ? 'on' : ''}" data-act="grammarLevel" data-level="${l}">${l === 'saved' ? '★ 저장' : l}<span class="num">${n}</span></button>`
   }).join('')
   const ghero = `<div class="ghero">${mascot('mascot')}<div><h1>JLPT 문법</h1><p>주제별로 묶어 보고, 헷갈리는 짝까지 한 번에 · 어려운 건 ☆로 모아 두기</p></div></div>`
-  if (lv !== 'saved' && !isOpen('grammar', lv)) return ghero + `<div class="tabs gtabs">${tabs}</div>` + lockedPanel(`${lv} 문법 ${GRAMMAR.filter(g => g.level === lv).length}개`, unlockHint('grammar', lv))
+  const quizOpen = lv === 'saved' || isOpen('grammar', lv)
   const list = lv === 'saved' ? GRAMMAR.filter(g => saved.includes(g.id)) : GRAMMAR.filter(g => g.level === lv)
   const seen = list.filter(g => progress.seenGrammar.includes(g.id)).length
   const item = g => {
@@ -969,7 +966,7 @@ function grammarView() {
   ${ghero}
   <div class="tabs gtabs">${tabs}</div>
   ${list.length ? `<div class="subbar"><p class="sub">${lv === 'saved' ? `저장한 문법 ${list.length}개` : `${lv} 문법 ${list.length}개 · 본 문법 <span class="num">${seen} / ${list.length}</span>`}</p>
-    <button class="btn" data-act="grammarQuiz">${lv === 'saved' ? '저장한 문법 퀴즈' : `${lv} 문법 퀴즈`}</button></div>` : ''}
+    ${quizOpen ? `<button class="btn" data-act="grammarQuiz">${lv === 'saved' ? '저장한 문법 퀴즈' : `${lv} 문법 퀴즈`}</button>` : `<span class="quizlock">${LOCK}퀴즈는 ${unlockHint('grammar', lv)}</span>`}</div>` : ''}
   <div class="panel glist">${items}${empty}</div>`
 }
 
@@ -1023,7 +1020,7 @@ function correctionCardHTML() {
     return `<button class="choice fixopt${cls}" data-act="fixPick" data-i="${i}" lang="ja" ${done ? 'disabled' : ''}>${furi(o)}</button>`
   }).join('')
   return `<div class="panel fixcard">
-    <div class="fixhead">${mascot(done ? (done.ok ? 'cheer' : 'sad') : 'think', 'fixcat')}<div><div class="eyebrow">${b.name}의 오늘의 교정</div><b>${done ? (done.ok ? '맞았어요, 이 짝은 안 헷갈리네요' : '헷갈렸죠, 내일 다시 나와요') : '빈칸에 맞는 것은'}</b></div></div>
+    <div class="fixhead">${mascot(done ? (done.ok ? 'cheer' : 'sad') : 'think', 'fixcat')}<div><div class="eyebrow">오늘 채울 반쪽 · ${b.name}의 교정</div><b>${done ? (done.ok ? '맞았어요, 이 짝은 안 헷갈리네요' : '헷갈렸죠, 내일 다시 나와요') : '빈칸에 맞는 것은'}</b></div></div>
     <div class="gsent fixsent" lang="ja">${sent}</div><p class="fixko">${c.e.ko}</p>
     <div class="fixopts">${btns}</div>
     ${done ? `<p class="fixdiff">${c.g.diff}</p><div class="actions"><button class="btn pri" data-act="startFix">교정 10문제 더 풀기</button></div>` : ''}
@@ -1173,7 +1170,7 @@ async function showReportCard(schoolId) {
   g.strokeStyle = '#d2402e'; g.lineWidth = 8; g.beginPath(); g.arc(0, 0, 90, 0, Math.PI * 2); g.stroke()
   g.fillStyle = '#d2402e'; g.textAlign = 'center'; g.font = '700 96px "Noto Serif JP", serif'; g.fillText('卒', 0, 34); g.restore()
   g.fillStyle = '#8b6d3f'; g.textAlign = 'left'; g.font = '32px Jua, sans-serif'
-  g.fillText(new Date().toLocaleDateString('ko-KR'), 150, H - 150); g.fillText('일본어 첫걸음', 150, H - 105)
+  g.fillText(new Date().toLocaleDateString('ko-KR'), 150, H - 150); g.fillText('반쯤 아는 일본어', 150, H - 105)
   const url = c.toDataURL('image/png')
   const el = document.createElement('div')
   el.className = 'rcover'
@@ -1186,7 +1183,7 @@ async function showReportCard(schoolId) {
     if (!b || b.dataset.rc === 'close') { el.remove(); return }
     try {
       const blob = await (await fetch(url)).blob(), file = new File([blob], `seiseki-${sc.id}.png`, { type: 'image/png' })
-      if (navigator.canShare && navigator.canShare({ files: [file] })) await navigator.share({ files: [file], title: '일본어 첫걸음 성적표' })
+      if (navigator.canShare && navigator.canShare({ files: [file] })) await navigator.share({ files: [file], title: '반쯤 아는 일본어 성적표' })
       else { const a = document.createElement('a'); a.href = url; a.download = file.name; a.click() }
     } catch { /* 공유 취소 */ }
   })
@@ -1318,7 +1315,7 @@ function stageDoneView() {
     <div class="done${passed ? '' : ' fail'}">
       ${qz.right === total ? hanamaruSVG() : ''}
       ${mascot(qz.graduated ? 'party' : passed ? 'cheer' : 'sad')}
-      <p>${qz.graduated ? `${sc.name} 졸업을 축하해요` : passed ? `${st.name} 통과` : `${stageSize(st)}문제 중 ${passNeed(st)}개 이상 맞히면 통과예요`}</p>
+      <p>${qz.graduated ? (sc.id === 'high' ? '반쯤 아는 일본어, 졸업' : `${sc.name} 졸업을 축하해요`) : passed ? `${st.name} 통과` : `${stageSize(st)}문제 중 ${passNeed(st)}개 이상 맞히면 통과예요`}</p>
       <div class="bigstars">${[1, 2, 3].map(k => `<i class="${k <= qz.stars ? 'on' : ''}" style="--d:${k * 220}ms">★</i>`).join('')}</div>
       <div class="stats">
         <div class="stat"><b class="num">${qz.right} / ${total}</b><small>맞힌 문제</small></div>
@@ -1557,7 +1554,7 @@ const ACTIONS = {
   },
   grammarJump(btn) {
     const g = GRAMMAR.find(x => x.id === btn.dataset.id)
-    if (!g || !isOpen('grammar', g.level)) { SFX.bad(); return true }
+    if (!g) { SFX.bad(); return true }
     state.grammarLevel = g.level; state.grammarOpen = g.id
     if (!progress.seenGrammar.includes(g.id)) { progress.seenGrammar.push(g.id); addXP(2) }
     render()
@@ -1847,11 +1844,11 @@ function showOpening() {
   if (progress.openedOn === todayStr()) return   // 하루 첫 실행에만 오프닝
   const reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches
   const s = streak()
-  const title = '일본어 첫걸음'
+  const title = '반쯤 아는 일본어'
   const el = document.createElement('div')
   el.id = 'opening'
   el.setAttribute('role', 'dialog')
-  el.setAttribute('aria-label', '일본어 첫걸음 시작 화면')
+  el.setAttribute('aria-label', '반쯤 아는 일본어 시작 화면')
   el.innerHTML = `
     <div class="op-petals" aria-hidden="true">${Array.from({ length: 16 }, (_, i) => `<i style="--l:${(i * 37) % 100}%;--d:${((i * 0.43) % 3).toFixed(2)}s;--t:${5 + (i % 5)}s;--s:${9 + (i % 4) * 3}px;--c:${PETAL_COLORS[i % 3]}"></i>`).join('')}</div>
     <div class="op-cell">
@@ -1862,6 +1859,7 @@ function showOpening() {
       <span class="op-hanko">${PAW}</span>
     </div>
     <h1 class="op-title">${[...title].map((c, i) => c === ' ' ? '<span class="sp"> </span>' : `<span style="--i:${i}">${c}</span>`).join('')}</h1>
+    <p class="op-tag">뜻은 아는데, 읽지를 못해서</p>
     <p class="op-sub"><span class="lvchip"><b class="num">Lv.${playerLevel()}</b>${rankName()}</span>${s >= 2 ? `<span class="op-streak">${s}일 연속</span>` : ''}</p>
     <div class="op-btns"><button class="btn pri op-start" data-snd="on">소리 켜고 시작</button><button class="btn op-quiet" data-snd="off">조용히 시작</button></div>`
   document.body.appendChild(el)

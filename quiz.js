@@ -131,10 +131,11 @@ function makeHighKanjiQuestion(key) {
       head: wordCells(w), prompt: `읽는 법은 <span class="dim">· ${m}</span>${tag}`,
       choices: shuffle([...picks].map(x => ({ html: x, ok: x === r }))) }
   }
-  const others = shuffle([...new Set(list.map(e => e[2]).filter(x => x !== m))]).slice(0, 3)
+  // 읽기를 보여 주고 그렇게 읽는 낱말 고르기 (한국어 뜻 고르기는 쓰지 않는다)
+  const others = shuffle([...new Set(list.filter(e => e[1] !== r && e[0] !== w && Math.abs(e[0].length - w.length) <= 1).map(e => e[0]))]).slice(0, 3)
   return { key, review, right, wrong: right, mode: 'kanji',
-    head: wordCells(w), prompt: `뜻은 <span class="dim">· ${r}</span>${tag}`,
-    choices: shuffle([m, ...others].map(x => ({ html: x, ok: x === m, ko: true }))) }
+    head: `<div class="gq" lang="ja">「${r}」</div>`, prompt: `이렇게 읽는 낱말은${tag}`,
+    choices: shuffle([w, ...others].map(x => ({ html: x, ok: x === w }))) }
 }
 
 function partQuestions(part, wrong) {
@@ -222,20 +223,26 @@ function makeReadQuestion(key, pool) {
   }
 }
 
+// "m:六" — 한국어 뜻 대신, 읽기를 보여 주고 그렇게 읽는 낱말을 고른다.
+// 같은 한자의 다른 낱말(六つ ↔ 六月)이 꼭 오답으로 들어가서 "한 글자 여러 읽기"를 가려내게 한다
 function makeMeaningQuestion(key, pool) {
   const c = key.split(':')[1]
   const k = KANJI[c]
-  const others = shuffle(pool.filter(x => x !== c).map(x => KANJI[x].meaning)).filter(x => x !== k.meaning)
-  const picks = [k.meaning, ...new Set(others)].slice(0, 4)
-  const [w, r] = k.examples[0]
+  const ex = k.examples
+  const [w, r, m] = ex[[...key].reduce((n, ch) => n + ch.charCodeAt(0), 0) % ex.length]
+  const picks = [w]
+  for (const e of ex) if (e[0] !== w && e[1] !== r && !picks.includes(e[0])) picks.push(e[0])
+  const others = shuffle(pool.filter(x => x !== c).flatMap(x => KANJI[x].examples).filter(e => e[1] !== r && Math.abs(e[0].length - w.length) <= 1))
+  for (const e of others) { if (picks.length >= 4) break; if (!picks.includes(e[0])) picks.push(e[0]) }
+  const rest = ex.filter(e => e[0] !== w).map(e => `${e[0]}(${e[1]})`).join(' · ')
   return {
     key,
-    head: `<span class="masu xl" lang="ja">${c}</span>`,
-    prompt: '뜻과 음은',
-    choices: shuffle(picks.map(x => ({ html: x, ok: x === k.meaning, ko: true }))),
-    right: readingsText(k),
-    wrong: `${c} = ${k.meaning} · 예: ${w}(${r})`,
-    review: `<span class="jp" lang="ja">${c}</span><span class="dim">${k.meaning}</span>`,
+    head: `<div class="gq" lang="ja">「${r}」</div>`,
+    prompt: '이렇게 읽는 낱말은',
+    choices: shuffle(picks.map(x => ({ html: x, ok: x === w }))),
+    right: `${w} = ${r}${rest ? ` · ${rest}` : ''}`,
+    wrong: `${w} = ${r} · ${c}: ${readingsText(k)}${rest ? ` · ${rest}` : ''}`,
+    review: `<span class="jp" lang="ja"><ruby>${w}<rt>${r}</rt></ruby></span><span class="dim">${m}</span>`,
   }
 }
 
