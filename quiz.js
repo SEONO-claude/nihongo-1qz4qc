@@ -52,9 +52,68 @@ function makeVerbQuestion(key) {
   }
 }
 
-function buildVerbQuiz(wrongKeys) {
-  const all = WORDS.flatMap(w => FORMS.map(f => `${w.id}:${f}`))
-  return pickKeys(wrongKeys, all).map(makeVerbQuestion)
+// 동사 수준: elem 초등, mid 중학, high 고등
+const VERB_LEVELS = { elem: '초등', mid: '중학', high: '고등' }
+function verbLevel(w) { return w.level || 'elem' }
+function verbKeys(level) {
+  return WORDS.filter(w => level === 'all' || verbLevel(w) === level).flatMap(w => FORMS.map(f => `${w.id}:${f}`))
+}
+function buildVerbQuiz(wrongKeys, level = 'all') {
+  return pickKeys(wrongKeys, verbKeys(level)).map(makeVerbQuestion)
+}
+
+// ───── 퀘스트: 초등학교 → 중학교 → 고등학교 ─────
+// 스테이지마다 10문제를 여러 종류에서 섞어 낸다. part: { t: 'kanji'|'verb'|'grammar', n, ... }
+const SCHOOLS = [
+  { id: 'elem', name: '초등학교', mark: '小', color: 'pink', reward: '졸업장 · 중학 동사 · N4 문법',
+    stages: [
+      { id: 'e1', name: '1학년', parts: [{ t: 'kanji', grades: [1], n: 6 }, { t: 'verb', level: 'elem', n: 2 }, { t: 'grammar', levels: ['N5'], n: 2 }] },
+      { id: 'e2', name: '2학년', parts: [{ t: 'kanji', grades: [2], n: 5 }, { t: 'verb', level: 'elem', n: 3 }, { t: 'grammar', levels: ['N5'], n: 2 }] },
+      { id: 'e3', name: '3학년', parts: [{ t: 'kanji', grades: [3], n: 5 }, { t: 'verb', level: 'elem', n: 3 }, { t: 'grammar', levels: ['N5'], n: 2 }] },
+      { id: 'e4', name: '4학년', parts: [{ t: 'kanji', grades: [4], n: 4 }, { t: 'verb', level: 'elem', n: 3 }, { t: 'grammar', levels: ['N5'], n: 3 }] },
+      { id: 'e5', name: '5학년', parts: [{ t: 'kanji', grades: [5], n: 4 }, { t: 'verb', level: 'elem', n: 3 }, { t: 'grammar', levels: ['N4'], n: 3 }] },
+      { id: 'e6', name: '6학년', parts: [{ t: 'kanji', grades: [6], n: 4 }, { t: 'verb', level: 'elem', n: 3 }, { t: 'grammar', levels: ['N4'], n: 3 }] },
+      { id: 'ef', name: '졸업 시험', boss: true, parts: [{ t: 'kanji', grades: [1, 2, 3, 4, 5, 6], n: 4 }, { t: 'verb', level: 'elem', n: 3 }, { t: 'grammar', levels: ['N5', 'N4'], n: 3 }] },
+    ] },
+  { id: 'mid', name: '중학교', mark: '中', color: 'sky', reward: '졸업장 · 고등 동사 · N2 문법',
+    stages: [
+      { id: 'm1', name: '1학년', parts: [{ t: 'verb', level: 'mid', n: 5 }, { t: 'grammar', levels: ['N4'], n: 3 }, { t: 'kanji', grades: [4, 5, 6], n: 2 }] },
+      { id: 'm2', name: '2학년', parts: [{ t: 'verb', level: 'mid', n: 5 }, { t: 'grammar', levels: ['N4', 'N3'], n: 3 }, { t: 'kanji', grades: [5, 6], n: 2 }] },
+      { id: 'm3', name: '3학년', parts: [{ t: 'verb', level: 'mid', n: 4 }, { t: 'grammar', levels: ['N3'], n: 4 }, { t: 'kanji', grades: [6], n: 2 }] },
+      { id: 'mf', name: '졸업 시험', boss: true, parts: [{ t: 'verb', level: 'mid', n: 4 }, { t: 'grammar', levels: ['N4', 'N3'], n: 4 }, { t: 'kanji', grades: [1, 2, 3, 4, 5, 6], n: 2 }] },
+    ] },
+  { id: 'high', name: '고등학교', mark: '高', color: 'leaf', reward: '졸업장 · JLPT 마스터',
+    stages: [
+      { id: 'h1', name: '1학년', parts: [{ t: 'verb', level: 'high', n: 5 }, { t: 'grammar', levels: ['N3'], n: 5 }] },
+      { id: 'h2', name: '2학년', parts: [{ t: 'verb', level: 'high', n: 5 }, { t: 'grammar', levels: ['N2'], n: 5 }] },
+      { id: 'h3', name: '3학년', parts: [{ t: 'verb', level: 'high', n: 4 }, { t: 'grammar', levels: ['N2', 'N1'], n: 6 }] },
+      { id: 'hf', name: '졸업 시험', boss: true, parts: [{ t: 'verb', level: 'high', n: 4 }, { t: 'grammar', levels: ['N2', 'N1'], n: 6 }] },
+    ] },
+]
+const STAGES = SCHOOLS.flatMap(s => s.stages.map(st => ({ ...st, school: s.id })))
+const PASS = 8   // 10문제 중 8개 이상이면 통과
+
+function partQuestions(part, wrong) {
+  let keys = [], make
+  if (part.t === 'kanji') {
+    const maxGrade = Math.max(...part.grades)
+    const pool = Object.keys(KANJI).filter(c => part.grades.includes(KANJI[c].grade))
+    keys = pool.flatMap(c => [`m:${c}`, ...readIndexes(c, maxGrade).map(i => `r:${c}:${i}`)])
+    make = k => { const q = k.startsWith('r:') ? makeReadQuestion(k, pool) : makeMeaningQuestion(k, pool); q.mode = 'kanji'; return q }
+    return pickKeys(wrong.kanji, keys).slice(0, part.n).map(make)
+  }
+  if (part.t === 'verb') {
+    keys = verbKeys(part.level)
+    if (!keys.length) keys = verbKeys('elem')   // 아직 그 수준 동사가 없으면 초등 동사로
+    return pickKeys(wrong.verb, keys).slice(0, part.n).map(k => { const q = makeVerbQuestion(k); q.mode = 'verb'; return q })
+  }
+  const pool = GRAMMAR.filter(g => part.levels.includes(g.level))
+  keys = pool.flatMap(g => [`ga:${g.id}`, `gc:${g.id}`, ...g.examples.map((_, i) => `gb:${g.id}:${i}`)])
+  return pickKeys(wrong.grammar, keys).slice(0, part.n).map(k => { const q = makeGrammarQuestion(k); q.mode = 'grammar'; return q })
+}
+
+function buildStageQuiz(stage, wrong) {
+  return shuffle(stage.parts.flatMap(p => partQuestions(p, wrong)))
 }
 
 // ───── 한자 퀴즈 ─────

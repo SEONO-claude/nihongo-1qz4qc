@@ -221,6 +221,7 @@ td .ko { display: block; color: var(--ink-2); font-size: 13px; }
 .panel .row .jp { font-size: 18px; line-height: 2; }
 main.wide { max-width: 1040px; }
 .tablewrap { overflow-x: auto; }
+.fsep { flex-basis: 100%; height: 0; }
 .alltable { min-width: 720px; }
 .alltable thead th { position: sticky; top: 0; background: var(--card); font-size: 13px; padding: 12px 16px; }
 .alltable thead th:first-child { left: 0; z-index: 2; border-right: 2px solid var(--line); }
@@ -264,6 +265,66 @@ main.wide { max-width: 1040px; }
 .gstar.on { background: var(--sun-t); border-color: var(--sun-d); color: var(--sun-d); }
 .gempty { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 28px 20px; text-align: center; color: var(--ink-2); }
 .gempty .mascot { width: 96px; height: 96px; }
+
+/* ───── 퀘스트 지도 ───── */
+.questhead { display: flex; align-items: center; gap: 12px; padding: 16px 20px; border-radius: 20px; background: var(--sun-t); border: 2px solid var(--line); border-bottom-width: 4px; margin-bottom: 12px; }
+.questhead .mascot { width: 72px; height: 72px; flex: none; }
+.questhead h1 { margin: 0; font-family: var(--round); font-size: 24px; font-weight: 400; }
+.questhead p { margin: 2px 0 0; font-size: 14px; color: var(--ink-2); }
+.questhead b { color: var(--sun-d); font-weight: 600; }
+.questbar { display: flex; gap: 10px; margin-bottom: 16px; }
+.questbar .btn.pri { flex: 1; }
+.school { position: relative; margin-bottom: 16px; padding: 16px 16px 8px; border-radius: 24px; background: var(--card); border: 2px solid var(--line); border-bottom-width: 5px; }
+.schoolhd { display: flex; align-items: center; gap: 12px; }
+.schoolhd > div { flex: 1; }
+.schoolhd b { display: block; font-family: var(--round); font-size: 21px; font-weight: 400; }
+.schoolhd small { color: var(--ink-2); font-size: 13px; }
+.smark { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 14px; background: var(--c); color: #fff; font-family: var(--mincho); font-size: 24px; font-weight: 600; box-shadow: 0 3px 0 var(--cd); }
+.gradbadge { padding: 4px 12px; border-radius: 999px; background: var(--ct); color: var(--cd); font-family: var(--round); font-size: 15px; }
+.school.locked { opacity: 0.85; background: repeating-linear-gradient(135deg, var(--card) 0 14px, var(--raised) 14px 28px); }
+.school.locked .smark { background: var(--ink-3); box-shadow: 0 3px 0 var(--edge); }
+.school.locked .icon { color: var(--ink-3); width: 24px; height: 24px; }
+.reward { margin: 12px 0 8px; padding: 8px 12px; border-radius: 12px; background: var(--card); border: 2px dashed var(--line); font-size: 13px; color: var(--ink-2); }
+.path { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 16px 0 8px; }
+.node { position: relative; display: flex; flex-direction: column; align-items: center; transform: translateX(var(--x)); }
+.nodebtn {
+  width: 68px; height: 68px; border-radius: 50%; border: 0; display: grid; place-items: center;
+  font-family: var(--round); font-size: 26px; color: #fff; background: var(--c); box-shadow: 0 6px 0 var(--cd);
+  transition: transform 100ms var(--ease), box-shadow 100ms var(--ease);
+}
+.nodebtn:active:not(:disabled) { transform: translateY(4px); box-shadow: 0 2px 0 var(--cd); }
+.node.boss .nodebtn { width: 80px; height: 80px; font-family: var(--mincho); font-size: 34px; font-weight: 600; background: var(--sun); box-shadow: 0 6px 0 var(--sun-d); }
+.node.lock .nodebtn { background: var(--raised); color: var(--ink-3); box-shadow: 0 6px 0 var(--edge); }
+.node.lock .nodebtn .icon { width: 24px; height: 24px; }
+.node.clear .nodebtn { background: var(--c); }
+.node.here .nodebtn { animation: nodePulse 1.6s var(--ease) infinite; }
+.nname { margin-top: 10px; font-family: var(--round); font-size: 14px; color: var(--ink-2); }
+.stars { display: inline-flex; gap: 1px; font-size: 15px; line-height: 1; }
+.stars i { font-style: normal; color: var(--line); }
+.stars i.on { color: var(--sun); }
+.nodemascot { position: absolute; left: 76px; top: -6px; width: 64px; animation: hop 2.4s var(--ease) infinite; pointer-events: none; }
+.nodemascot img { width: 100%; height: auto; display: block; }
+@keyframes nodePulse { 0%, 100% { box-shadow: 0 6px 0 var(--cd), 0 0 0 0 var(--ct); } 50% { box-shadow: 0 6px 0 var(--cd), 0 0 0 10px var(--ct); } }
+
+/* 스테이지 중 위쪽 줄 */
+.stagebar { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.stagebar .stagename { flex: 1; line-height: 1.2; }
+.stagebar small { display: block; color: var(--ink-3); font-size: 12px; }
+.stagebar b { font-family: var(--round); font-size: 19px; font-weight: 400; }
+.stagegoal { padding: 4px 10px; border-radius: 999px; background: var(--ct); color: var(--ink-2); font-size: 12px; white-space: nowrap; }
+.done.fail { background: var(--raised); }
+.bigstars { display: flex; gap: 8px; margin-top: 6px; font-size: 40px; line-height: 1; }
+.bigstars i { font-style: normal; color: var(--line); }
+.bigstars i.on { color: var(--sun); animation: starPop 520ms var(--spring) var(--d) both; text-shadow: 0 3px 0 var(--sun-d); }
+@keyframes starPop { 0% { transform: scale(0) rotate(-30deg); } 100% { transform: scale(1) rotate(0); } }
+
+/* 졸업장 */
+.diploma { margin: 16px; padding: 20px; border-radius: 12px; background: #fffaf0; color: #3a2e1f; text-align: center; border: 3px double #c9a45c; box-shadow: inset 0 0 0 6px #fffaf0, inset 0 0 0 7px #e2c88f; animation: popIn 600ms var(--spring) 400ms both; }
+.dtitle { font-family: var(--mincho); font-size: 30px; font-weight: 600; letter-spacing: 0.2em; }
+.dname { font-family: var(--round); font-size: 16px; color: #8a6d3b; margin-bottom: 8px; }
+.diploma p { margin: 0; font-size: 14px; line-height: 1.7; }
+.dfoot { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; font-size: 13px; color: #8a6d3b; }
+.hanko { display: grid; place-items: center; width: 48px; height: 48px; border: 3px solid #d2402e; border-radius: 50%; color: #d2402e; font-family: var(--mincho); font-size: 24px; font-weight: 700; transform: rotate(-12deg); animation: stampIn 600ms var(--spring) 900ms both; --r: -12deg; }
 
 /* 문법 퀴즈 문제 */
 .gq { font-size: 30px; line-height: 2; text-align: center; color: var(--ink); }
@@ -330,7 +391,7 @@ main.wide { max-width: 1040px; }
 .done p { margin: 4px 0 0; font-family: var(--round); font-size: 24px; }
 .done .stats { display: flex; gap: 12px; margin-top: 12px; }
 .done .stat { min-width: 96px; padding: 8px 14px; border-radius: 14px; border: 2px solid var(--line); background: var(--card); text-align: center; }
-.done .stat b { display: block; font-family: var(--round); font-size: 24px; font-weight: 400; color: var(--sun-d); }
+.done .stat b { display: block; font-family: var(--round); font-size: 22px; font-weight: 400; color: var(--sun-d); white-space: nowrap; }
 .done .stat small { color: var(--ink-3); font-size: 12px; }
 .hanamaru { width: 132px; height: 132px; fill: none; stroke: var(--pen); stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; transform: rotate(-8deg); }
 .hanamaru path { stroke-dasharray: 1; stroke-dashoffset: 1; }
