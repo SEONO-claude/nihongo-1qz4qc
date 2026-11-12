@@ -773,3 +773,15 @@ main[data-view="talk"] { --acc: var(--sky); --acc-d: var(--sky-d); --acc-t: var(
 .talkstampwin small { color: var(--ink-2); font-size: 13px; }
 .tstamp.big { display: grid; place-items: center; width: 56px; height: 56px; border: 3px solid #d2402e; border-radius: 50%; color: #d2402e; opacity: 1; font-size: 28px; font-weight: 700; --r: -10deg; animation: stampIn 600ms var(--spring) 600ms both; }
 @media (max-width: 520px) { .tgrid { grid-template-columns: repeat(5, 1fr); } .quizbar .tabs button { padding: 0 9px; } }
+
+/* ───── 의성어 카드 ───── */
+.onobox { margin: 4px 16px 12px; display: grid; gap: 8px; }
+.onouse { display: flex; align-items: baseline; gap: 10px; font-size: 15px; }
+.onouse b { flex: none; font-family: var(--round); font-size: 13px; font-weight: 400; color: var(--ink-3); }
+.onoex { position: relative; display: flex; flex-direction: column; gap: 2px; padding: 10px 44px 10px 14px; border-radius: 14px; background: var(--raised); }
+.onoex .jp { font-size: 17px; line-height: 1.9; }
+.onoex .ko { font-size: 13px; color: var(--ink-2); }
+.onowhen { margin: 0; font-size: 13px; color: var(--ink-3); }
+.gq.onoq { font-family: var(--jp); font-size: 40px; letter-spacing: 0.04em; }
+@media (max-width: 520px) { .quizbar .tabs button { padding: 0 7px; font-size: 14px; } }
+.choice.wrap { white-space: normal; line-height: 1.35; word-break: keep-all; padding-top: 8px; padding-bottom: 8px; }

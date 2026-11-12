@@ -429,3 +429,34 @@ function makeTalkQuestion(key) {
 function buildTalkQuiz(sceneId, wrongKeys) {
   return pickKeys(wrongKeys, talkKeys(sceneId)).map(makeTalkQuestion)
 }
+
+// ───── 의성어·의태어 ─────
+// 문제 키: "om:dokidoki" 뜻 고르기 · "ow:dokidoki" 상황 보고 고르기 · "of:dokidoki" 예문 빈칸
+const ONO_CATS = ['감정', '사람 모습', '날씨·자연', '소리', '움직임', '상태·촉감', '맛·식감']
+function onoList() { return typeof ONO === 'undefined' ? [] : ONO }
+function onoById(id) { return onoList().find(o => o.id === id) }
+function onoKeys(cat) {
+  return onoList().filter(o => cat === 'all' || o.cat === cat).flatMap(o => [`om:${o.id}`, `ow:${o.id}`, `of:${o.id}`])
+}
+function makeOnoQuestion(key) {
+  const [type, id] = key.split(':')
+  const o = onoById(id)
+  const tag = ` <span class="gqlv">${o.cat}</span>`
+  // 오답은 같은 분류에서 먼저 (같은 말이 두 뜻일 때는 빼고)
+  const pool = [...shuffle(onoList().filter(x => x !== o && x.cat === o.cat)), ...shuffle(onoList().filter(x => x.cat !== o.cat))]
+  const pick3 = f => { const out = [], seen = new Set([f(o)]); for (const x of pool) { if (out.length >= 3) break; if (x.word === o.word) continue; if (!seen.has(f(x))) { seen.add(f(x)); out.push(f(x)) } } return out }
+  const right = `${o.word} = ${o.meaning}${o.ko ? ` (${o.ko})` : ''}`
+  const review = `<span class="jp" lang="ja">${o.word}</span><span class="dim">${o.meaning}${o.ko ? ` · ${o.ko}` : ''}</span>`
+  const ex = `${furi(o.example.jp.replace(/［|］/g, ''))} · ${o.example.ko}`
+  if (type === 'om') return { key, mode: 'ono', review, right: ex, wrong: `${right} · 예: ${ex}`,
+    head: `<div class="gq onoq" lang="ja">${o.word}</div>`, prompt: `무슨 뜻일까요${tag}`,
+    choices: shuffle([o.meaning, ...pick3(x => x.meaning)].map(x => ({ html: x, ok: x === o.meaning, ko: true }))) }
+  if (type === 'ow') return { key, mode: 'ono', review, right, wrong: `${right} · 예: ${ex}`,
+    head: `<div class="gq ko">${o.when}</div>`, prompt: `이럴 때 쓰는 말은${tag}`,
+    choices: shuffle([o.word, ...pick3(x => x.word)].map(x => ({ html: x, ok: x === o.word }))) }
+  return { key, mode: 'ono', review, right, wrong: right,
+    head: `<div class="gsent" lang="ja">${furi(o.example.jp.replace(/［[^［］]*］/, '<span class="blank">（　　）</span>'))}</div>`,
+    prompt: `빈칸에 알맞은 말은 <span class="dim">· ${o.example.ko}</span>${tag}`,
+    choices: shuffle([o.word, ...pick3(x => x.word)].map(x => ({ html: x, ok: x === o.word }))) }
+}
+function buildOnoQuiz(cat, wrongKeys) { return pickKeys(wrongKeys, onoKeys(cat)).map(makeOnoQuestion) }

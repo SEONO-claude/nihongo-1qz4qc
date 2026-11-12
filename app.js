@@ -1,6 +1,6 @@
 // ───── 진도 저장 (localStorage) ─────
 const STORE_KEY = 'jp-study-progress'
-const EMPTY = { seen: {}, seenKanji: [], learnedForms: [], wrong: [], learnedKanji: [], wrongKanji: [], lastStudy: '', studyDays: [], today: { date: '', cards: 0, quizzes: 0, xp: 0 }, xp: 0, sound: true, music: true, savedGrammar: [], seenHigh: [], seenGrammar: [], learnedGrammar: [], wrongGrammar: [], stages: {}, graduated: [], badges: [], bestCombo: 0, musicVol: 1, sfxVol: 1, buddy: 'mike', track: 'all', talkSeen: [], learnedTalk: [], wrongTalk: [], talkStamps: {} }
+const EMPTY = { seen: {}, seenKanji: [], learnedForms: [], wrong: [], learnedKanji: [], wrongKanji: [], lastStudy: '', studyDays: [], today: { date: '', cards: 0, quizzes: 0, xp: 0 }, xp: 0, sound: true, music: true, savedGrammar: [], seenHigh: [], seenGrammar: [], learnedGrammar: [], wrongGrammar: [], stages: {}, graduated: [], badges: [], bestCombo: 0, musicVol: 1, sfxVol: 1, buddy: 'mike', track: 'all', talkSeen: [], learnedTalk: [], wrongTalk: [], talkStamps: {}, learnedOno: [], wrongOno: [] }
 
 function loadProgress() {
   try { return { ...EMPTY, ...JSON.parse(localStorage.getItem(STORE_KEY) || '{}') } }
@@ -297,7 +297,7 @@ const pickOne = list => list[Math.floor(Math.random() * list.length)]
 
 // ───── 공통 ─────
 const app = document.getElementById('app')
-const state = { view: 'home', cardType: 'verb', cardIdx: { verb: 0, adj: 0, noun: 0, high: 0 }, verb: 0, kanji: null, quiz: null, grade: 1, conjMode: 'one', conjGroup: 0, quizMode: 'verb', quizGrade: 0, grammarLevel: 'N5', grammarOpen: null, quizLevel: 'N5', quizTab: 'quest', stage: null, verbQuizLevel: 'all', talkScene: null, talkQuiz: 'all', showCasual: false }
+const state = { view: 'home', cardType: 'verb', cardIdx: { verb: 0, adj: 0, noun: 0, high: 0, ono: 0 }, verb: 0, kanji: null, quiz: null, grade: 1, conjMode: 'one', conjGroup: 0, quizMode: 'verb', quizGrade: 0, grammarLevel: 'N5', grammarOpen: null, quizLevel: 'N5', quizTab: 'quest', stage: null, verbQuizLevel: 'all', talkScene: null, talkQuiz: 'all', showCasual: false, onoQuiz: 'all' }
 
 // ───── 퀘스트 진행 ─────
 function stageStars(id) { return progress.stages[id] || 0 }
@@ -317,6 +317,7 @@ function newQuiz() {
   const wrong = { kanji: progress.wrongKanji, verb: progress.wrong, grammar: progress.wrongGrammar }
   const list = state.quizMode === 'stage' ? buildStageQuiz(STAGES.find(s => s.id === state.stage), wrong)
     : state.quizMode === 'kanji' ? buildKanjiQuiz(state.quizGrade, progress.wrongKanji)
+    : state.quizMode === 'ono' ? buildOnoQuiz(state.onoQuiz || 'all', progress.wrongOno)
     : state.quizMode === 'talk' ? buildTalkQuiz(state.talkQuiz || 'all', progress.wrongTalk)
     : state.quizMode === 'grammar' ? buildGrammarQuiz(state.quizLevel, progress.savedGrammar, progress.wrongGrammar)
     : buildVerbQuiz(progress.wrong, state.verbQuizLevel)
@@ -529,6 +530,7 @@ function homeView() {
   </div>
   <div class="panel">
     <div class="hd">지금까지</div>
+    ${bar('의성어 도감', seenCount('ono'), ONO_CARDS.length || 150)}
     ${bar('회화 장면 도장', Object.keys(progress.talkStamps).length, typeof TALK === 'undefined' ? 20 : TALK.length)}
     ${bar('고양이 친구', CATS.filter(catOpen).length, CATS.length)}
     ${bar('딴 배지', progress.badges.length, BADGES.length)}
@@ -653,11 +655,14 @@ function splitRuby(w, r) {
 }
 const HIGH_CARDS = typeof HIGH_KANJI === 'undefined' ? [] : Object.keys(HK_SETS).flatMap(s => (HIGH_KANJI[s] || []).map(([w, r, m], i) => (
   { id: `${s}:${i}`, set: s, kanji: w, reading: r, meaning: m, ruby: splitRuby(w, r), cat: HK_SETS[s] })))
+// 의성어·의태어 카드: 가나 칸으로 보여 준다
+const ONO_CARDS = (typeof ONO === 'undefined' ? [] : ONO).map(o => ({ ...o, kanji: o.word, reading: o.word, ruby: [[o.word, '']] }))
 const CARD_TYPES = {
   verb: { label: '동사', list: WORDS, prefix: '' },
   adj: { label: '형용사', list: ADJECTIVES, prefix: 'a:' },
   noun: { label: '명사', list: NOUN_LIST, prefix: 'n:' },
   high: { label: '고등 한자', list: HIGH_CARDS, prefix: 'h:' },
+  ono: { label: '의성어', list: ONO_CARDS, prefix: 'o:' },
 }
 function cardOpen(type, x) {
   return type === 'verb' ? isOpen('verb', verbLevel(x)) : type === 'high' ? isOpen('kanji', HK_SET_GRADE[x.set]) : true
@@ -682,6 +687,10 @@ function verbOptions(selected) {
 function cardOptions() {
   const list = cardList(), sel = cardIndex()
   if (state.cardType === 'verb') return verbOptions(sel)
+  if (state.cardType === 'ono') return ONO_CATS.map(c => {
+    const items = list.map((x, i) => [x, i]).filter(([x]) => x.cat === c)
+    return items.length ? `<optgroup label="${c} ${items.length}개">${items.map(([x, i]) => `<option value="${i}" ${i === sel ? 'selected' : ''}>${x.word} · ${x.meaning}</option>`).join('')}</optgroup>` : ''
+  }).join('')
   if (state.cardType === 'high') return Object.entries(HK_SETS).map(([s, name]) => {
     const items = list.map((x, i) => [x, i]).filter(([x]) => x.set === s)
     if (!items.length) return `<optgroup label="${name} ${highList(HK_SET_GRADE[s]).length}개 · 잠김" disabled></optgroup>`
@@ -725,7 +734,7 @@ function cardsView() {
   const lockedN = CARD_TYPES[type].list.length - list.length
   const nextLock = lockedN && i === list.length - 1
     ? `<p class="locknote">${LOCK}다음 카드 ${lockedN}장은 ${type === 'verb' ? unlockHint('verb', Object.keys(UNLOCK_AT.verb).find(l => !isOpen('verb', l))) : unlockHint('kanji', [10, 11, 12].find(g => !isOpen('kanji', g)))}</p>` : ''
-  const sub = type === 'verb' ? `${VERB_LEVELS[verbLevel(w)]} 동사 · ${GROUP_LABEL[w.group]}` : type === 'adj' ? ADJ_LABEL[w.type] : type === 'high' ? `고등 ${w.cat}` : w.cat
+  const sub = type === 'verb' ? `${VERB_LEVELS[verbLevel(w)]} 동사 · ${GROUP_LABEL[w.group]}` : type === 'adj' ? ADJ_LABEL[w.type] : type === 'high' ? `고등 ${w.cat}` : type === 'ono' ? `${w.cat}${w.ko ? ' · ' + w.ko : ''}` : w.cat
   const hasKanji = w.ruby.some(p => p[1] && [...p[0]].some(ch => KANJI[ch]))
   const hint = [w.note ? w.note.replace(/\.$/, '') : '', hasKanji ? '한자를 누르면 음독과 훈독이 나와요' : ''].filter(Boolean).join(' · ')
   return `
@@ -740,10 +749,15 @@ function cardsView() {
     <div class="mean">${w.meaning}<span>${sub}</span></div>
     ${hint ? `<div class="hint">${hint}</div>` : ''}
     ${type === 'adj' ? adjTable(w) : ''}
+    ${type === 'ono' ? `<div class="onobox"><div class="onouse"><b>자주 쓰는 꼴</b><span lang="ja">${furi(w.use)}</span></div>
+      <div class="onoex"><span class="jp" lang="ja">${gMark(w.example.jp)}</span><span class="ko">${w.example.ko}</span>
+      <button class="tspeak" data-act="speakOno" data-id="${w.id}" aria-label="읽어 주기">${SPEAK_ICON}</button></div>
+      <p class="onowhen">${w.when}</p></div>` : ''}
     ${state.kanji ? kanjiInfo(state.kanji) : ''}
     <div class="actions">
       <button class="btn" data-act="prevCard" ${i === 0 ? 'disabled' : ''}>${icon('left')}이전</button>
       ${type === 'verb' ? '<button class="btn" data-act="showConj">변화표 보기</button>' : ''}
+      ${type === 'ono' ? '<button class="btn" data-act="onoQuiz">퀴즈</button>' : ''}
       <button class="btn pri" data-act="nextCard" ${i === list.length - 1 ? 'disabled' : ''}>다음${icon('right')}</button>
     </div>
     ${nextLock}
@@ -1042,7 +1056,7 @@ function quizHeader() {
       <div class="stagename"><small>${sc.name}</small><b>${st.name}</b></div>
       <span class="stagegoal">${PASS}개 이상 통과</span></div>`
   }
-  const modes = [['verb', '동사'], ['kanji', '한자'], ['grammar', '문법'], ['talk', '회화']]
+  const modes = [['verb', '동사'], ['kanji', '한자'], ['grammar', '문법'], ['talk', '회화'], ['ono', '의성어']]
     .map(([m, label]) => `<button class="${state.quizMode === m ? 'on' : ''}" data-act="quizMode" data-mode="${m}">${label}</button>`).join('')
   const back = `<button class="btn icon-only" data-act="quizTab" data-tab="quest" aria-label="퀘스트 지도로">${icon('left')}</button>`
   // 한 줄로: [←][동사 | 한자 | 문법] + 동사는 수준, 한자는 학년, 문법은 급수 고르기
@@ -1050,6 +1064,8 @@ function quizHeader() {
     ? `<select class="gradesel" data-act="verbLevelSel" aria-label="동사 수준 고르기">${['all', 'elem', 'mid', 'high'].map(l => { const lock = l !== 'all' && !isOpen('verb', l); return `<option value="${l}" ${state.verbQuizLevel === l ? 'selected' : ''}${lock ? ' disabled' : ''}>${l === 'all' ? '열린 동사 전체' : `${VERB_LEVELS[l]} 동사${lock ? ' (잠김)' : ''}`}</option>` }).join('')}</select>`
     : state.quizMode === 'kanji'
     ? `<select class="gradesel" data-act="quizGradeSel" aria-label="학년 고르기">${[0, ...kanjiGrades()].map(g => { const lock = g > 0 && !isOpen('kanji', g); return `<option value="${g}" ${state.quizGrade === g ? 'selected' : ''}${lock ? ' disabled' : ''}>${g ? (g <= 6 ? `초등 ${g}학년` : g <= 9 ? `중학 ${g - 6}묶음` : gradeLong(g)) + (lock ? ' (잠김)' : '') : '열린 한자 전체'}</option>` }).join('')}</select>`
+    : state.quizMode === 'ono'
+    ? `<select class="gradesel" data-act="onoQuizSel" aria-label="분류 고르기"><option value="all">모든 의성어</option>${ONO_CATS.map(c => `<option value="${c}" ${state.onoQuiz === c ? 'selected' : ''}>${c}</option>`).join('')}</select>`
     : state.quizMode === 'talk'
     ? `<select class="gradesel" data-act="talkQuizSel" aria-label="장면 고르기"><option value="all">모든 장면</option>${(typeof TALK === 'undefined' ? [] : TALK).map(s => `<option value="${s.id}" ${state.talkQuiz === s.id ? 'selected' : ''}>${s.name}${progress.talkStamps[s.id] ? ' · 도장' : ''}</option>`).join('')}</select>`
     : state.quizMode === 'grammar'
@@ -1087,7 +1103,9 @@ function quizView() {
     // 글자 수에 맞춰 크기를 정해 항상 한 줄에 들어가게 한다 (폰 보기 칸 안쪽 폭 약 148px)
     const len = [...c.html.replace(/<rt>.*?<\/rt>/g, '').replace(/<[^>]+>/g, '')].length
     const fs = Math.max(12, Math.min(20, Math.floor((c.ko ? 160 : 148) / Math.max(len, 1))))
-    return `<button class="${cls}" data-pick="${i}" style="--fs:${fs}px" ${c.ko ? '' : 'lang="ja"'} ${answered ? 'disabled' : ''}>${c.html}${answered && c.ok ? maruSVG() : ''}</button>`
+    // 긴 한국어 보기(의성어 뜻풀이 등)는 두 줄까지 허용
+    if (c.ko && len > 12) cls += ' wrap'
+    return `<button class="${cls}" data-pick="${i}" style="--fs:${c.ko && len > 12 ? 14 : fs}px" ${c.ko ? '' : 'lang="ja"'} ${answered ? 'disabled' : ''}>${c.html}${answered && c.ok ? maruSVG() : ''}</button>`
   }).join('')
   // 문장 배열: 아래 조각을 눌러 위 줄에 차례로 놓고, 놓은 조각을 누르면 되돌린다
   let body = `<div class="choices">${buttons}</div>`
@@ -1156,8 +1174,8 @@ function pick(i) {
   qz.picked = i
   const q = qz.list[qz.i]
   const m = q.mode || state.quizMode
-  const learned = m === 'kanji' ? 'learnedKanji' : m === 'grammar' ? 'learnedGrammar' : m === 'talk' ? 'learnedTalk' : 'learnedForms'
-  const wrong = m === 'kanji' ? 'wrongKanji' : m === 'grammar' ? 'wrongGrammar' : m === 'talk' ? 'wrongTalk' : 'wrong'
+  const learned = m === 'kanji' ? 'learnedKanji' : m === 'grammar' ? 'learnedGrammar' : m === 'talk' ? 'learnedTalk' : m === 'ono' ? 'learnedOno' : 'learnedForms'
+  const wrong = m === 'kanji' ? 'wrongKanji' : m === 'grammar' ? 'wrongGrammar' : m === 'talk' ? 'wrongTalk' : m === 'ono' ? 'wrongOno' : 'wrong'
   const ok = q.choices[i].ok
   if (ok) {
     qz.right++
@@ -1175,6 +1193,7 @@ function pick(i) {
   saveProgress()
   render()
   if (m === 'talk') { const l = talkLineOf(q.key); if (l) setTimeout(() => speakJa(l.jp), 350) }
+  if (m === 'ono') { const o = onoById(q.key.split(':')[1]); if (o) setTimeout(() => speakJa(o.word), 350) }
   if (ok) {
     const gain = qz.combo >= 3 ? 15 : 10
     qz.xp += gain
@@ -1281,6 +1300,8 @@ const ACTIONS = {
   quizMode(btn) { state.quizMode = btn.dataset.mode; newQuiz() },
   quizGrade(btn) { state.quizGrade = Number(btn.dataset.grade); newQuiz() },
   restartQuiz() { newQuiz() },
+  onoQuiz() { const w = cardList()[cardIndex()]; state.quizMode = 'ono'; state.onoQuiz = w ? w.cat : 'all'; state.quizTab = 'free'; go('quiz'); return true },
+  speakOno(btn) { const o = onoById(btn.dataset.id); if (o) speakJa(o.example.jp.replace(/［|］/g, '')); btn.classList.add('on'); setTimeout(() => btn.classList.remove('on'), 900); return true },
   talkOpen(btn) { state.talkScene = btn.dataset.id; SFX.tap(); window.scrollTo(0, 0) },
   talkBack() { state.talkScene = null; window.scrollTo(0, 0) },
   talkCasual() { state.showCasual = !state.showCasual; SFX.tap() },
@@ -1375,6 +1396,7 @@ document.addEventListener('change', e => {
   if (e.target.matches('select[data-act="pickCard"]')) { ACTIONS.pickCard(e.target); render() }
   if (e.target.matches('select[data-act="quizGradeSel"]')) { state.quizGrade = Number(e.target.value); newQuiz(); render() }
   if (e.target.matches('select[data-act="quizLevelSel"]')) { state.quizLevel = e.target.value; newQuiz(); render() }
+  if (e.target.matches('select[data-act="onoQuizSel"]')) { state.onoQuiz = e.target.value; newQuiz(); render() }
   if (e.target.matches('select[data-act="talkQuizSel"]')) { state.talkQuiz = e.target.value; newQuiz(); render() }
   if (e.target.matches('select[data-act="verbLevelSel"]')) { state.verbQuizLevel = e.target.value; newQuiz(); render() }
 })
