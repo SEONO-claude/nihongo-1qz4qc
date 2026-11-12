@@ -422,7 +422,7 @@ function kanjiView() {
   return `
   <section class="banner">
     <img src="${IMAGES.kanji}" alt="벚꽃 핀 학교 가는 길, 돌담 위의 빨간 란도셀" width="1680" height="720">
-    <div class="banner-text"><h1>초등 필수 한자</h1><p><span class="num">${seenAll} / ${Object.keys(KANJI).length}</span>자를 봤어요</p></div>
+    <div class="banner-text"><h1>${state.grade >= 7 ? "중학 상용 한자" : "초등 필수 한자"}</h1><p><span class="num">${seenAll} / ${Object.keys(KANJI).length}</span>자를 봤어요</p></div>
   </section>
   <div class="tabs">${tabs}</div>
   <div class="subbar"><p class="sub">${sub}</p><button class="btn" data-act="kanjiQuiz">${gradeName(state.grade)} 한자 퀴즈</button></div>
