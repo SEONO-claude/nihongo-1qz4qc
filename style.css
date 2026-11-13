@@ -945,3 +945,9 @@ body.quizzing .qcard { display: flex; flex-direction: column; min-height: calc(1
 body.quizzing .qcard > .q + * { margin-top: auto; }
 /* 문제(한자·문장)는 말풍선과 보기 사이 빈 곳의 가운데에 */
 body.quizzing .qcard > .q { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+/* 정답 알림 자리: 늘 같은 높이라서 답을 골라도 문제·보기가 위로 밀리지 않는다 */
+.fbslot { flex: none; height: 118px; margin: 0 14px 14px; }
+.fbslot .feedback { position: static; margin: 0; height: 100%; box-sizing: border-box; display: flex; align-items: center; overflow: hidden; }
+.fbslot .feedback .in { width: 100%; }
+.fbslot .feedback span { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; font-size: 13px; line-height: 1.45; }
+.fbslot .feedback .fmascot { width: 48px; height: 48px; }

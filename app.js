@@ -1435,14 +1435,15 @@ function quizView() {
   const mood = !answered ? 'think' : ok ? 'cheer' : 'sad'
   const say = !answered ? q.prompt : ok ? qz.say : qz.say
   const last = qz.i === qz.list.length - 1
-  const sheet = answered ? `
+  // 알림 칸은 늘 같은 높이로 자리를 잡아 두어, 답을 골라도 문제와 보기가 움직이지 않게 한다
+  const sheet = !answered ? '<div class="fbslot" aria-hidden="true"></div>' : `<div class="fbslot">
   <div class="feedback ${ok ? 'good' : 'bad'}" role="status">
     <div class="in">
       ${mascot(ok ? 'cheer' : 'sad', 'fmascot')}
       <div class="ftext"><b>${ok ? '정답이에요' : '아쉬워요'}${ok && qz.justMastered ? '<span class="masterpop">★ 마스터</span>' : ''}</b><span>${ok ? (q.right || '') : q.wrong}</span></div>
       <button class="btn pri" data-act="nextQ" id="nextbtn">${last ? '결과 보기' : '계속'}</button>
     </div>
-  </div>` : ''
+  </div></div>`
   return quizHeader() + quizTop(qz) + `
   <div class="panel qcard">
     <div class="qhead">${mascot(mood)}<div class="bubble" ${answered ? '' : 'aria-live="polite"'}>${say}</div></div>
