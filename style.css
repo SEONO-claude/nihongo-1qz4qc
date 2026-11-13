@@ -943,3 +943,5 @@ body.quizzing main { padding-bottom: calc(24px + env(safe-area-inset-bottom)); }
 /* 문제 카드를 화면 높이만큼 늘리고, 보기는 카드 아래쪽에 붙인다 */
 body.quizzing .qcard { display: flex; flex-direction: column; min-height: calc(100dvh - 222px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); }
 body.quizzing .qcard > .q + * { margin-top: auto; }
+/* 문제(한자·문장)는 말풍선과 보기 사이 빈 곳의 가운데에 */
+body.quizzing .qcard > .q { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; }
