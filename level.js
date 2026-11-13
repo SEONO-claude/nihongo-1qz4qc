@@ -86,26 +86,26 @@ function catCard(c) {
 // ───── 배지 ─────
 // mark: 도장에 새길 한자 한 글자
 const BADGES = [
-  { id: 'first', mark: '始', name: '첫걸음', desc: '퀘스트 첫 스테이지 통과', ok: () => clearedCount() >= 1 },
-  { id: 'perfect', mark: '満', name: '만점', desc: '스테이지 10문제 모두 맞히기', ok: () => Object.values(progress.stages).includes(3) },
-  { id: 'combo10', mark: '連', name: '10연속', desc: '퀴즈 10문제 연속 정답', ok: () => (progress.bestCombo || 0) >= 10 },
+  { id: 'first', mark: '始', name: '첫걸음', desc: '퀘스트 첫 칸 통과', ok: () => clearedCount() >= 1 },
+  { id: 'perfect', mark: '満', name: '만점', desc: '한 칸 만점 받기', ok: () => Object.values(progress.stages).includes(3) },
+  { id: 'combo10', mark: '連', name: '10연속', desc: '10문제 연속 정답', ok: () => (progress.bestCombo || 0) >= 10 },
   { id: 'streak3', mark: '三', name: '사흘 연속', desc: '3일 연속 공부', ok: () => streak() >= 3 },
   { id: 'streak7', mark: '七', name: '일주일 연속', desc: '7일 연속 공부', ok: () => streak() >= 7 },
   { id: 'kanji100', mark: '百', name: '한자 100자', desc: '한자 100자 보기', ok: () => progress.seenKanji.filter(c => KANJI[c]).length >= 100 },
   { id: 'kanji1000', mark: '千', name: '한자 1000자', desc: '한자 1000자 보기', ok: () => progress.seenKanji.filter(c => KANJI[c]).length >= 1000 },
-  { id: 'star20', mark: '星', name: '별 20개', desc: '퀘스트 별 20개 모으기', ok: () => totalStars() >= 20 },
-  { id: 'talk1', mark: '話', name: '첫 대화', desc: '회화 장면 도장 1개', ok: () => Object.keys(progress.talkStamps || {}).length >= 1 },
-  { id: 'talk10', mark: '旅', name: '여행 준비', desc: '회화 장면 도장 10개', ok: () => Object.keys(progress.talkStamps || {}).length >= 10 },
-  { id: 'talkall', mark: '達', name: '회화 달인', desc: '회화 장면 도장 모두', ok: () => typeof TALK !== 'undefined' && Object.keys(progress.talkStamps || {}).length >= TALK.length },
-  { id: 'ono50', mark: '音', name: '소리 수집가', desc: '의성어 카드 50개 보기', ok: () => typeof seenCount === 'function' && seenCount('ono') >= 50 },
-  { id: 'onoall', mark: '響', name: '의성어 도감 완성', desc: '의성어 카드 모두 보기', ok: () => typeof ONO !== 'undefined' && seenCount('ono') >= ONO.length },
-  { id: 'master30', mark: '極', name: '마스터 30', desc: '문법·한자·문장 30개 마스터(3연속 정답)', ok: () => Object.values(progress.master || {}).filter(v => v === 3).length >= 30 },
+  { id: 'star20', mark: '星', name: '별 20개', desc: '별 20개 모으기', ok: () => totalStars() >= 20 },
+  { id: 'talk1', mark: '話', name: '첫 대화', desc: '회화 도장 1개', ok: () => Object.keys(progress.talkStamps || {}).length >= 1 },
+  { id: 'talk10', mark: '旅', name: '여행 준비', desc: '회화 도장 10개', ok: () => Object.keys(progress.talkStamps || {}).length >= 10 },
+  { id: 'talkall', mark: '達', name: '회화 달인', desc: '회화 도장 전부', ok: () => typeof TALK !== 'undefined' && Object.keys(progress.talkStamps || {}).length >= TALK.length },
+  { id: 'ono50', mark: '音', name: '소리 수집가', desc: '의성어 50개 보기', ok: () => typeof seenCount === 'function' && seenCount('ono') >= 50 },
+  { id: 'onoall', mark: '響', name: '의성어 도감 완성', desc: '의성어 전부 보기', ok: () => typeof ONO !== 'undefined' && seenCount('ono') >= ONO.length },
+  { id: 'master30', mark: '極', name: '마스터 30', desc: '30개 마스터하기', ok: () => Object.values(progress.master || {}).filter(v => v === 3).length >= 30 },
   { id: 'chest7', mark: '宝', name: '보물 사냥꾼', desc: '보물상자 7번 열기', ok: () => (progress.chests || 0) >= 7 },
-  { id: 'mockpass', mark: '合', name: '합격선 돌파', desc: 'JLPT 실력 체크에서 합격선 넘기', ok: () => Object.entries(progress.mock || {}).some(([l, s]) => s >= ({ N5: 80, N4: 90, N3: 95, N2: 90, N1: 100 })[l]) },
+  { id: 'mockpass', mark: '合', name: '합격선 돌파', desc: '실력 체크 합격선', ok: () => Object.entries(progress.mock || {}).some(([l, s]) => s >= ({ N5: 80, N4: 90, N3: 95, N2: 90, N1: 100 })[l]) },
   { id: 'elem', mark: '小', name: '초등 졸업', desc: '초등학교 졸업 시험 통과', ok: () => progress.graduated.includes('elem') },
   { id: 'mid', mark: '中', name: '중학 졸업', desc: '중학교 졸업 시험 통과', ok: () => progress.graduated.includes('mid') },
   { id: 'high', mark: '高', name: '고등 졸업', desc: '고등학교 졸업 시험 통과', ok: () => progress.graduated.includes('high') },
-  { id: 'allstars', mark: '輝', name: '별 전부', desc: `별 ${STAGES.length * 3}개 모두 모으기`, ok: () => totalStars() >= STAGES.length * 3 },
+  { id: 'allstars', mark: '輝', name: '별 전부', desc: `별 ${STAGES.length * 3}개 모으기`, ok: () => totalStars() >= STAGES.length * 3 },
 ]
 function earnedBadges() { return BADGES.filter(b => progress.badges.includes(b.id)) }
 // 새로 딴 배지를 기록하고 돌려준다

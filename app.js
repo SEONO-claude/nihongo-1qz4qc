@@ -523,12 +523,11 @@ function homeView() {
   ${nextGoal}
   <div class="homegrid">${reviewCardHTML()}${mockCardHTML()}</div>
   <div class="panel">
-    <div class="hd">나의 기록</div>
+    <button class="hd hdlink" data-go="me">나의 기록<span>전체 보기 ›</span></button>
     ${bar('마스터한 문법 ★', masterCount('g:'), GRAMMAR.length)}
     ${bar('마스터한 한자 ★', masterCount('k:'), Object.keys(KANJI).length)}
     ${bar('회화 장면 도장', Object.keys(progress.talkStamps).length, typeof TALK === 'undefined' ? 20 : TALK.length)}
     ${bar('고양이 친구', CATS.filter(catOpen).length, CATS.length)}
-    <button class="linkbtn" data-go="me">전체 기록 보기</button>
   </div>
   ${offlineReady ? '<p class="sub offline">인터넷 없이도 열 수 있어요</p>' : ''}`
 }
@@ -572,23 +571,25 @@ function meView() {
   </div>
   <div class="panel melist">
     <div class="hd">설정</div>
-    <button class="merow" data-act="meSound"><b>소리</b><span>배경음악 · 효과음 음량, 곡 고르기</span></button>
-    <button class="merow" data-go="quiz"><b>고양이 친구 · 배지</b><span>퀘스트 지도 아래에서 볼 수 있어요</span></button>
+    <button class="merow" data-act="meSound"><span><b>소리</b><small>배경음악 · 효과음 음량, 곡 고르기</small></span><i aria-hidden="true">›</i></button>
+    <button class="merow" data-go="quiz"><span><b>고양이 친구 · 배지</b><small>퀘스트 지도 아래에 있어요</small></span><i aria-hidden="true">›</i></button>
   </div>
   <div class="panel melist">
     <div class="hd">기록 보관</div>
     <p class="menote">공부 기록은 이 휴대폰 안에만 저장돼요. 휴대폰을 바꾸거나 앱을 지우기 전에 내보내 두세요.</p>
-    <button class="merow" data-act="meExport"><b>기록 내보내기</b><span>파일로 저장하거나 보내기</span></button>
-    <button class="merow" data-act="meImport"><b>기록 가져오기</b><span>내보낸 파일로 되살리기</span></button>
+    <button class="merow" data-act="meExport"><span><b>기록 내보내기</b><small>파일로 저장하거나 보내기</small></span><i aria-hidden="true">›</i></button>
+    <button class="merow" data-act="meImport"><span><b>기록 가져오기</b><small>내보낸 파일로 되살리기</small></span><i aria-hidden="true">›</i></button>
     <input type="file" id="importfile" accept=".json,application/json" hidden>
-    <button class="merow danger" data-act="meReset"><b>기록 초기화</b><span>처음부터 다시 시작</span></button>
   </div>
   <div class="panel melist">
     <div class="hd">앱 정보</div>
-    <p class="menote"><b>개인정보</b> · 이 앱은 회원 가입이 없고, 공부 기록을 서버로 보내지 않아요. 모든 기록은 이 기기 안에만 있어요.</p>
-    <p class="menote"><b>자료 출처</b> · 한자 읽기와 학년 자료는 KANJIDIC2(EDRDG, CC BY-SA 4.0)를 바탕으로 했어요. 예문과 설명, 그림은 이 앱을 위해 새로 만들었어요.</p>
-    <p class="menote"><b>버전</b> · 1.0.0</p>
-  </div>`
+    <div class="meinfo"><b>개인정보</b><span>회원 가입이 없고, 공부 기록을 서버로 보내지 않아요. 모든 기록은 이 기기 안에만 있어요.</span></div>
+    <div class="meinfo"><b>자료 출처</b><span>한자 읽기와 학년 자료는 KANJIDIC2(EDRDG, CC BY-SA 4.0)를 바탕으로 했어요. 예문과 설명, 그림은 이 앱을 위해 새로 만들었어요.</span></div>
+  </div>
+  <div class="panel melist mereset">
+    <button class="merow danger" data-act="meReset"><span><b>기록 초기화</b><small>모든 기록을 지우고 처음부터 시작</small></span></button>
+  </div>
+  <p class="mever">미묘한 일본어 · 버전 1.0.0</p>`
 }
 // 기록 내보내기·가져오기
 async function exportProgress() {
@@ -627,8 +628,10 @@ function kanjiGrades() {
 }
 // 학년 탭: 잠긴 학년에는 자물쇠
 function gradeTabs() {
-  return kanjiGrades().map(g => { const open = isOpen('kanji', g)
-    return `<button class="${g === state.grade ? 'on' : ''}${open ? '' : ' locked'}" data-act="grade" data-grade="${g}">${open ? '' : LOCK}${gradeName(g)}</button>` }).join('')
+  const all = kanjiGrades(), locked = all.filter(g => !isOpen('kanji', g))
+  const open = all.filter(g => isOpen('kanji', g)).map(g => `<button class="${g === state.grade ? 'on' : ''}" data-act="grade" data-grade="${g}">${gradeName(g)}</button>`).join('')
+  // 잠긴 학년은 "잠긴 학년 n개" 한 칸으로: 누르면 다음에 열릴 학년의 안내가 나온다
+  return open + (locked.length ? `<button class="locked${locked.includes(state.grade) ? ' on' : ''}" data-act="grade" data-grade="${locked[0]}">${LOCK}잠긴 학년 ${locked.length}개</button>` : '')
 }
 
 // 고등 한자: 단어 목록 (누르면 위에 읽기·뜻과 쓰인 한자 카드)
@@ -814,7 +817,6 @@ function cardsView() {
   return `
   ${wordSeg('cards')}
   <div class="tabs cardtabs">${tabs}</div>
-  ${type === 'verb' ? '<button class="linkbtn" data-go="conj">동사 변화표 전체 보기</button>' : ''}
   <div class="picker">
     <select data-act="pickCard" aria-label="${CARD_TYPES[type].label} 고르기">${cardOptions()}</select>
   </div>
