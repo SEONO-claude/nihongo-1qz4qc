@@ -1433,7 +1433,11 @@ function quizView() {
       ${answered ? '' : `<button class="btn pri ocheck" data-act="checkOrder" ${built.length === q.order.parts.length ? '' : 'disabled'}>확인</button>`}`
   }
   const mood = !answered ? 'think' : ok ? 'cheer' : 'sad'
-  const say = !answered ? q.prompt : ok ? qz.say : qz.say
+  // 말풍선에는 질문만, 한국어 뜻(· 뒤 글)은 문제 바로 위에 따로 보여 준다 (답을 고른 뒤에도 남는다)
+  const hintM = String(q.prompt || '').match(/<span class="dim">·\s*([\s\S]*?)<\/span>/)
+  const hint = hintM ? hintM[1] : ''
+  const promptMain = hintM ? q.prompt.replace(hintM[0], '').replace(/\s+(?=<span class="gqlv">)/, ' ') : q.prompt
+  const say = !answered ? promptMain : qz.say
   const last = qz.i === qz.list.length - 1
   // 알림 칸: 맞혔을 때·틀렸을 때 설명 중 긴 쪽 크기로 자리를 미리 잡아 둔다.
   // 그래서 답을 골라도 문제·보기가 움직이지 않고, 설명은 잘리지 않고 다 보인다.
@@ -1449,7 +1453,7 @@ function quizView() {
   return quizHeader() + quizTop(qz) + `
   <div class="panel qcard">
     <div class="qhead">${mascot(mood)}<div class="bubble" ${answered ? '' : 'aria-live="polite"'}>${say}</div></div>
-    <div class="q">${q.head}</div>
+    <div class="q">${hint ? `<p class="qhint">${hint}</p>` : ''}${q.head}</div>
     ${body}
     ${sheet}
   </div>`

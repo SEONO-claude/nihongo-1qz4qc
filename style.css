@@ -953,3 +953,4 @@ body.quizzing .qcard > .q { flex: 1; display: flex; flex-direction: column; alig
 .fbslot .feedback .in { width: 100%; }
 .fbslot .feedback span { display: block; -webkit-line-clamp: unset; overflow: visible; font-size: 14px; line-height: 1.5; }
 .fbslot .feedback .fmascot { width: 48px; height: 48px; }
+.qhint { margin: 0; max-width: 100%; font-size: 15px; line-height: 1.5; color: var(--ink-2); text-align: center; word-break: keep-all; }

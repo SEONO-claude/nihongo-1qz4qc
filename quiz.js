@@ -417,7 +417,7 @@ function kanjiPool(grade) {
 // 학년을 골랐으면 그 학년까지 배운 한자로만 된 예문을 읽기 문제로 쓴다
 function readIndexes(c, grade) {
   const ex = KANJI[c].examples
-  if (!grade) return ex.map((_, i) => i)
+  if (!grade) grade = KANJI[c].grade   // 학년을 안 골랐으면 그 한자의 학년까지 배운 한자로만
   const fits = ex.map((e, i) => [...e[0]].every(ch => !KANJI[ch] || KANJI[ch].grade <= grade) ? i : -1).filter(i => i >= 0)
   return fits.length ? fits : [0]
 }
