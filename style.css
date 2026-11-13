@@ -972,3 +972,8 @@ body.quizzing .qcard > .q { flex: 1; display: flex; flex-direction: column; alig
 .tabs button, .kcell, .hkrow, .tscene, .opiece, .catcard, .brand .mark.paw svg { transition-timing-function: var(--ease); }
 #kdetail, .feedback, .soundpanel { animation-timing-function: var(--ease); }
 .xpbadge b { color: var(--ink); font-weight: 400; }
+/* 퀘스트 칸 번호도 진한 분홍(흰 숫자 대비 5:1), 졸업 시험 칸은 노랑에 어두운 글씨 */
+.node .nodebtn, .node.clear .nodebtn { background: var(--pri); box-shadow: 0 6px 0 var(--pri-d); }
+.node .nodebtn:active:not(:disabled) { box-shadow: 0 2px 0 var(--pri-d); }
+.node.boss .nodebtn { background: var(--sun); box-shadow: 0 6px 0 var(--sun-d); color: var(--ink); }
+.node.lock .nodebtn { background: var(--raised); color: var(--ink-3); box-shadow: 0 6px 0 var(--edge); }
