@@ -273,7 +273,8 @@ function grammarOthers(g, pool, key) {
 //   ga 뜻 고르기 · gc 일본어 고르기 · gb 예문 속 문법 찾기   (알아보기)
 //   gf 빈칸 채우기 · gj 접속 형태 · go 문장 배열            (직접 말해 보기)
 function grammarKeys(g) {
-  const k = [`ga:${g.id}`, `gc:${g.id}`, ...g.examples.map((_, i) => `gb:${g.id}:${i}`)]
+  // "쓰인 문법은"(gb)은 정답이 문장에 그대로 보여서 내지 않는다
+  const k = [`ga:${g.id}`, `gc:${g.id}`]
   g.examples.forEach((e, i) => { if (e.jp.includes('［')) k.push(`gf:${g.id}:${i}`) })
   if (g.conn) k.push(`gj:${g.id}`)
   if (g.order) k.push(`go:${g.id}`)

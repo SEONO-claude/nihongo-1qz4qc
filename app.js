@@ -1111,7 +1111,7 @@ function missionsHTML(t, goal) {
 }
 function dueKeys() {
   const rv = progress.review || {}, today = todayStr()
-  return Object.keys(rv).filter(k => rv[k].due <= today).sort((a, b) => rv[a].due.localeCompare(rv[b].due))
+  return Object.keys(rv).filter(k => !k.startsWith('gb:') && rv[k].due <= today).sort((a, b) => rv[a].due.localeCompare(rv[b].due))
 }
 function reviewCardHTML() {
   const rv = progress.review || {}, all = Object.values(rv), due = dueKeys().length
