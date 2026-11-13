@@ -933,3 +933,13 @@ body.quizzing main { padding-bottom: calc(40px + env(safe-area-inset-bottom)); }
 /* 6-5 회화 장면 설명은 두 줄까지 */
 .tbody small { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.45; }
 .badge small { text-wrap: balance; word-break: keep-all; }
+
+/* ───── 엄지 쪽으로: 아래 메뉴를 키우고 홈 표시줄 위로, 문제 보기는 화면 아래쪽에 ───── */
+.tabbar { padding: 8px 6px calc(10px + env(safe-area-inset-bottom)); }
+.tabbar button { min-height: 62px; gap: 4px; font-size: 13px; border-radius: 16px; }
+.tabbar svg { width: 26px; height: 26px; }
+main { padding-bottom: calc(124px + env(safe-area-inset-bottom)); }
+body.quizzing main { padding-bottom: calc(24px + env(safe-area-inset-bottom)); }
+/* 문제 카드를 화면 높이만큼 늘리고, 보기는 카드 아래쪽에 붙인다 */
+body.quizzing .qcard { display: flex; flex-direction: column; min-height: calc(100dvh - 222px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); }
+body.quizzing .qcard > .q + * { margin-top: auto; }
