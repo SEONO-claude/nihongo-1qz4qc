@@ -1435,15 +1435,17 @@ function quizView() {
   const mood = !answered ? 'think' : ok ? 'cheer' : 'sad'
   const say = !answered ? q.prompt : ok ? qz.say : qz.say
   const last = qz.i === qz.list.length - 1
-  // 알림 칸은 늘 같은 높이로 자리를 잡아 두어, 답을 골라도 문제와 보기가 움직이지 않게 한다
-  const sheet = !answered ? '<div class="fbslot" aria-hidden="true"></div>' : `<div class="fbslot">
-  <div class="feedback ${ok ? 'good' : 'bad'}" role="status">
+  // 알림 칸: 맞혔을 때·틀렸을 때 설명 중 긴 쪽 크기로 자리를 미리 잡아 둔다.
+  // 그래서 답을 골라도 문제·보기가 움직이지 않고, 설명은 잘리지 않고 다 보인다.
+  const fb = (good, real) => `<div class="feedback ${good ? 'good' : 'bad'}">
     <div class="in">
-      ${mascot(ok ? 'cheer' : 'sad', 'fmascot')}
-      <div class="ftext"><b>${ok ? '정답이에요' : '아쉬워요'}${ok && qz.justMastered ? '<span class="masterpop">★ 마스터</span>' : ''}</b><span>${ok ? (q.right || '') : q.wrong}</span></div>
-      <button class="btn pri" data-act="nextQ" id="nextbtn">${last ? '결과 보기' : '계속'}</button>
+      ${mascot(good ? 'cheer' : 'sad', 'fmascot')}
+      <div class="ftext"><b>${good ? '정답이에요' : '아쉬워요'}${good && qz.justMastered ? '<span class="masterpop">★ 마스터</span>' : ''}</b><span>${good ? (q.right || '') : q.wrong}</span></div>
+      <button class="btn pri" data-act="nextQ" ${real ? 'id="nextbtn"' : 'tabindex="-1"'}>${last ? '결과 보기' : '계속'}</button>
     </div>
-  </div></div>`
+  </div>`
+  // 두 설명을 같은 칸에 겹쳐 두면, 칸 높이는 둘 중 더 큰 쪽이 된다
+  const sheet = `<div class="fbslot"><div class="fbghost" aria-hidden="true" inert>${fb(false, false)}</div><div class="fbghost" aria-hidden="true" inert>${fb(true, false)}</div>${answered ? `<div class="fbreal" role="status">${fb(ok, true)}</div>` : ''}</div>`
   return quizHeader() + quizTop(qz) + `
   <div class="panel qcard">
     <div class="qhead">${mascot(mood)}<div class="bubble" ${answered ? '' : 'aria-live="polite"'}>${say}</div></div>
