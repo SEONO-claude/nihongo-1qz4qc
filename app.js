@@ -1038,7 +1038,7 @@ function correctionCardHTML() {
 }
 // 교정 10문제: 헷갈리는 짝이 오답으로 나오는 빈칸 문제만, 틀렸던 것 먼저
 function buildFixQuiz() {
-  const keys = GRAMMAR.filter(g => isOpen('grammar', g.level) && (g.similar || []).length).flatMap(g => g.examples.map((x, i) => x.jp.includes('［') ? `gf:${g.id}:${i}` : null).filter(Boolean))
+  const keys = GRAMMAR.filter(g => isOpen('grammar', g.level) && (g.similar || []).length).flatMap(g => g.examples.map((x, i) => x.jp.includes('［') && gfPicks(g, i) ? `gf:${g.id}:${i}` : null).filter(Boolean))
   return pickKeys(progress.wrongGrammar, keys).map(k => { const q = makeGrammarQuestion(k); q.mode = 'grammar'; return q })
 }
 // 실력 진단(월반 시험): 단계마다 한자 1 + 문법 1, 연속으로 둘 다 맞힌 단계까지 건너뛴다
@@ -1054,7 +1054,7 @@ function buildPlacement() {
   const out = []
   PLACE_TIERS.forEach((t, ti) => {
     const kk = t.kanji >= 10 ? highKanjiKeys([HK_GRADE[t.kanji]]).filter(k => k.endsWith(':r')) : kanjiPool(t.kanji).flatMap(c => readIndexes(c, t.kanji).map(i => `r:${c}:${i}`))
-    const gk = GRAMMAR.filter(g => g.level === t.lv).flatMap(g => g.examples.map((x, i) => x.jp.includes('［') ? `gf:${g.id}:${i}` : null).filter(Boolean))
+    const gk = GRAMMAR.filter(g => g.level === t.lv).flatMap(g => g.examples.map((x, i) => x.jp.includes('［') && gfPicks(g, i) ? `gf:${g.id}:${i}` : null).filter(Boolean))
     for (const k of [shuffle(kk)[0], shuffle(gk)[0]]) { const q = k && questionFromKey(k); if (q) { q.tier = ti; out.push(q) } }
   })
   return out

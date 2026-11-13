@@ -233,10 +233,13 @@ function makeMeaningQuestion(key, pool) {
   const c = key.split(':')[1]
   const k = KANJI[c]
   const ex = k.examples
-  const [w, r, m] = ex[[...key].reduce((n, ch) => n + ch.charCodeAt(0), 0) % ex.length]
+  // 그 학년까지 배운 한자로만 된 낱말을 쓴다 (1학년 字 문제에 3학년 漢이 나오지 않게)
+  const fit = w => [...w].every(ch => !KANJI[ch] || KANJI[ch].grade <= k.grade)
+  const okEx = ex.filter(e => fit(e[0])), useEx = okEx.length ? okEx : ex
+  const [w, r, m] = useEx[[...key].reduce((n, ch) => n + ch.charCodeAt(0), 0) % useEx.length]
   const picks = [w]
-  for (const e of ex) if (e[0] !== w && e[1] !== r && !picks.includes(e[0])) picks.push(e[0])
-  const others = shuffle(pool.filter(x => x !== c).flatMap(x => KANJI[x].examples).filter(e => e[1] !== r && Math.abs(e[0].length - w.length) <= 1))
+  for (const e of useEx) if (e[0] !== w && e[1] !== r && !picks.includes(e[0])) picks.push(e[0])
+  const others = shuffle(pool.filter(x => x !== c).flatMap(x => KANJI[x].examples).filter(e => e[1] !== r && fit(e[0]) && Math.abs(e[0].length - w.length) <= 1))
   for (const e of others) { if (picks.length >= 4) break; if (!picks.includes(e[0])) picks.push(e[0]) }
   const rest = ex.filter(e => e[0] !== w).map(e => `${e[0]}(${e[1]})`).join(' · ')
   return {
@@ -275,10 +278,33 @@ function grammarOthers(g, pool, key) {
 // 문법 하나에서 나오는 문제들
 //   ga 뜻 고르기 · gc 일본어 고르기 · gb 예문 속 문법 찾기   (알아보기)
 //   gf 빈칸 채우기 · gj 접속 형태 · go 문장 배열            (직접 말해 보기)
+// 빈칸 문제의 오답: 빈칸 바로 앞 글자가 같은 예문에서만 가져온다.
+// (飲ん（ ）에 てもいい처럼 모양만 봐도 틀린 보기가 나오지 않게) 3개를 못 채우면 그 빈칸 문제는 내지 않는다
+const GF_PICKS = {}
+function gfPlain(s) { return s.replace(/\{([^{}|]+)\|[^{}|]+\}/g, '$1') }
+function gfPrev(jp) { const p = gfPlain(jp), i = p.indexOf('［'); return i > 0 ? p[i - 1] : '' }
+function gfPicks(g, ei) {
+  const key = g.id + ':' + ei
+  if (key in GF_PICKS) return GF_PICKS[key]
+  const e = g.examples[ei], ans = blankOf(e)
+  if (!ans) return (GF_PICKS[key] = null)
+  const pv = gfPrev(e.jp), LV = ['N5', 'N4', 'N3', 'N2', 'N1'], li = LV.indexOf(g.level)
+  const near = x => Math.abs(LV.indexOf(x.level) - li)
+  const order = [...(g.similar || []).map(grammarById).filter(Boolean), ...GRAMMAR.filter(x => x !== g).sort((a, b) => near(a) - near(b))]
+  const picks = [ans], seen = new Set([gfPlain(ans)])
+  for (const x of order) {
+    if (picks.length >= 4) break
+    for (const y of x.examples) {
+      const b = blankOf(y)
+      if (b && gfPrev(y.jp) === pv && !seen.has(gfPlain(b))) { picks.push(b); seen.add(gfPlain(b)); break }
+    }
+  }
+  return (GF_PICKS[key] = picks.length >= 4 ? picks : null)
+}
 function grammarKeys(g) {
   // "쓰인 문법은"(gb)은 정답이 문장에 그대로 보여서 내지 않는다
   const k = [`ga:${g.id}`, `gc:${g.id}`]
-  g.examples.forEach((e, i) => { if (e.jp.includes('［')) k.push(`gf:${g.id}:${i}`) })
+  g.examples.forEach((e, i) => { if (e.jp.includes('［') && gfPicks(g, i)) k.push(`gf:${g.id}:${i}`) })
   if (g.conn) k.push(`gj:${g.id}`)
   if (g.order) k.push(`go:${g.id}`)
   return k
@@ -298,10 +324,13 @@ function makeGrammarQuestion(qkey) {
   if (type === 'gf') {
     // 빈칸: 정답은 ［ ］ 속 글자, 오답은 헷갈리는 짝 → 같은 급수 순서로
     const e = g.examples[Number(ex)], ans = blankOf(e)
-    const cands = [...sim, ...shuffle(GRAMMAR.filter(x => x.level === g.level && x !== g))]
-      .map(x => x.examples.map(blankOf).find(Boolean)).filter(Boolean)
-    const picks = [ans]
-    for (const c of cands) { if (picks.length >= 4) break; if (!picks.some(x => plainJp(x) === plainJp(c))) picks.push(c) }
+    let picks = gfPicks(g, Number(ex))
+    if (!picks) {   // 예전에 저장된 키: 예전 방식으로
+      const cands = [...sim, ...shuffle(GRAMMAR.filter(x => x.level === g.level && x !== g))]
+        .map(x => x.examples.map(blankOf).find(Boolean)).filter(Boolean)
+      picks = [ans]
+      for (const c of cands) { if (picks.length >= 4) break; if (!picks.some(x => plainJp(x) === plainJp(c))) picks.push(c) }
+    }
     return {
       key: qkey,
       head: `<div class="gsent" lang="ja">${furi(e.jp.replace(/［[^［］]*］/, '<span class="blank">（　　）</span>'))}</div>`,
