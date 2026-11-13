@@ -26,7 +26,7 @@ const progress = loadProgress()
 // 오늘 한 공부 (날짜가 바뀌면 0부터)
 function todayStats() {
   if (progress.today.date !== todayStr()) progress.today = { date: todayStr(), cards: 0, quizzes: 0, xp: 0 }
-  for (const k of ['xp', 'correct', 'scenes', 'reviews', 'stages', 'grammar']) if (progress.today[k] === undefined) progress.today[k] = 0
+  for (const k of ['xp', 'correct', 'scenes', 'reviews', 'stages', 'grammar', 'solved']) if (progress.today[k] === undefined) progress.today[k] = 0
   return progress.today
 }
 function bumpToday(key) { todayStats()[key]++; saveProgress() }
@@ -453,7 +453,7 @@ function render() {
 // 위쪽 줄: 오늘 XP, 효과음 켜기/끄기
 function updateTop() {
   const xp = document.getElementById('xp')
-  if (xp) xp.innerHTML = `오늘 <b class="num">${todayStats().xp}</b> XP`
+  if (xp) xp.innerHTML = `오늘 <b class="num">${todayStats().solved}</b>문제`
   const s = document.getElementById('soundbtn')
   if (s) {
     s.innerHTML = `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="${ICONS[progress.sound ? 'sound' : 'mute']}"/></svg>`
@@ -481,7 +481,7 @@ function homeView() {
   const nextSt = STAGES[currentStageIndex()]
   const allClear = STAGES.every(x => stageCleared(x.id))
   const lead = allClear ? `졸업 뒤 목표 · 마스터 별 ★ ${masterCount('g:')} / ${GRAMMAR.length}`
-    : `다음 퀘스트 · ${schoolOf(nextSt.school).name} ${nextSt.name}` + (s >= 2 ? ` · ${s}일 연속` : '')
+    : `퀘스트 ${clearedCount()} / ${STAGES.length}칸 통과` + (s >= 2 ? ` · ${s}일 연속` : '')
 
   // 다음 목표: 지금 스테이지를 통과하면 무엇이 열리는지
   const after = STAGES[currentStageIndex() + 1]
@@ -500,7 +500,7 @@ function homeView() {
   const goal = (label, n, max, c) => `<div class="goal${n >= max ? ' done' : ''}" style="--c:${c}">
     <span>${label}${n >= max ? check : ''}</span><span class="num">${Math.min(n, max)} / ${max}</span>
     <div class="bar"><i style="width:${Math.min(n, max) / max * 100}%"></i></div></div>`
-  const hello = t.xp > 0 ? `오늘 ${t.xp} XP 모았어요` : s >= 2 ? `${s}일 연속이에요` : '같이 공부해요'
+  const hello = t.solved > 0 ? `오늘 ${t.solved}문제 풀었어요` : s >= 2 ? `${s}일 연속이에요` : '같이 공부해요'
   const main = allClear ? '<button class="btn pri" data-act="startFix">오늘의 교정 10문제</button>' : '<button class="btn pri" data-act="questContinue">퀘스트 계속</button>'
   const second = !progress.placed && clearedCount() < 3 ? '<button class="btn" data-act="startPlace">실력 진단</button>'
     : allClear ? '<button class="btn" data-go="quiz">퀘스트 지도</button>' : '<button class="btn" data-act="startFix">교정 10문제</button>'
@@ -1493,6 +1493,7 @@ function recentKeys() { return new Set(progress.recentQ || []) }
 function pick(i) {
   const qz = state.quiz
   if (qz.picked !== null) return
+  todayStats().solved++
   { const k = qz.list[qz.i].key; if (k) { const r = (progress.recentQ || []).filter(x => x !== k); r.push(k); progress.recentQ = r.slice(-400) } }
   const btn = document.querySelector(`[data-pick="${i}"]`)
   const [x, y] = btn ? centerOf(btn) : [innerWidth / 2, innerHeight / 2]

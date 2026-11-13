@@ -954,3 +954,21 @@ body.quizzing .qcard > .q { flex: 1; display: flex; flex-direction: column; alig
 .fbslot .feedback span { display: block; -webkit-line-clamp: unset; overflow: visible; font-size: 14px; line-height: 1.5; }
 .fbslot .feedback .fmascot { width: 48px; height: 48px; }
 .qhint { margin: 0; max-width: 100%; font-size: 15px; line-height: 1.5; color: var(--ink-2); text-align: center; word-break: keep-all; }
+
+/* ───── unslop 손질 (2026-11-13) ───── */
+/* 1·2. 주 버튼은 어디서나 같은 진한 분홍, 흰 글씨 대비 5:1 이상 */
+:root { --pri: #c9365f; --pri-d: #a42a4c; --pri-ink: #b52d55; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --pri-ink: #ff8fb0; } }
+:root[data-theme="dark"] { --pri-ink: #ff8fb0; }
+.btn.pri, main .btn.pri { background: var(--pri); border-color: var(--pri-d); color: #fff; }
+.feedback.good .btn.pri { --pri: #26834a; --pri-d: #1d6a3b; }
+.feedback.bad .btn.pri { --pri: #c4363d; --pri-d: #9f2a30; }
+.tabbar button.on { color: var(--pri-ink); }
+.seg button.on, .tabs button.on { color: var(--pri-ink); }
+/* 3. 이유 없이 계속 움직이는 것은 멈춘다 (지금 칸 깜빡임 하나만 남김) */
+.hero-mascot, .nodemascot, .op-start, .chest.shake { animation: none; }
+.hero-mascot.hop { animation: catBounce 900ms var(--spring) both; }
+/* 4. 창·목록은 튕기지 않고 부드럽게, 튕김은 축하 순간에만 */
+.tabs button, .kcell, .hkrow, .tscene, .opiece, .catcard, .brand .mark.paw svg { transition-timing-function: var(--ease); }
+#kdetail, .feedback, .soundpanel { animation-timing-function: var(--ease); }
+.xpbadge b { color: var(--ink); font-weight: 400; }
