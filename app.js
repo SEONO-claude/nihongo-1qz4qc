@@ -1871,7 +1871,7 @@ function showOpening() {
       <span class="op-hanko">${PAW}</span>
     </div>
     <h1 class="op-title">${[...title].map((c, i) => c === ' ' ? '<span class="sp"> </span>' : `<span style="--i:${i}">${c}</span>`).join('')}</h1>
-    <p class="op-tag">뜻은 아는데, 읽지를 못해서</p>
+    <p class="op-tag">뜻은 알죠. 읽는 법만 고쳐요</p>
     <p class="op-sub"><span class="lvchip"><b class="num">Lv.${playerLevel()}</b>${rankName()}</span>${s >= 2 ? `<span class="op-streak">${s}일 연속</span>` : ''}</p>
     <div class="op-btns"><button class="btn pri op-start" data-snd="on">소리 켜고 시작</button><button class="btn op-quiet" data-snd="off">조용히 시작</button></div>`
   document.body.appendChild(el)
