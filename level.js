@@ -136,7 +136,7 @@ function rewardsHTML(qz) {
   return `<div class="rewards">
     ${c ? `<div class="newcat"><div class="eyebrow">새 친구가 생겼어요</div>
       <img src="${catImage(c)}" alt="${c.name}" width="400" height="400">
-      <b>${c.name} <span lang="ja">${c.jp}</span></b><small>${c.kind} · 이름 뜻 「${c.mean}」</small>
+      <b>${c.name} <span lang="ja">${c.jp}</span></b><small>${c.kind}</small>
       ${buddy().id === c.id ? '<span class="buddytag">단짝</span>' : `<button class="btn" data-act="setBuddy" data-id="${c.id}">단짝으로 정하기</button>`}</div>` : ''}
     ${un.length ? `<div class="newopen"><div class="eyebrow">새로 열렸어요</div>
       <ul>${un.map((u, i) => `<li style="--d:${600 + i * 180}ms"><span class="ktag ${u.kind}">${{ stage: '퀘스트', kanji: '한자', verb: '동사', grammar: '문법', cat: '친구' }[u.kind]}</span>${u.label}</li>`).join('')}</ul></div>` : ''}

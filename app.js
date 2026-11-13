@@ -1480,9 +1480,11 @@ function quizDoneView() {
   </div>`
 }
 
+function recentKeys() { return new Set(progress.recentQ || []) }
 function pick(i) {
   const qz = state.quiz
   if (qz.picked !== null) return
+  { const k = qz.list[qz.i].key; if (k) { const r = (progress.recentQ || []).filter(x => x !== k); r.push(k); progress.recentQ = r.slice(-400) } }
   const btn = document.querySelector(`[data-pick="${i}"]`)
   const [x, y] = btn ? centerOf(btn) : [innerWidth / 2, innerHeight / 2]
   qz.picked = i

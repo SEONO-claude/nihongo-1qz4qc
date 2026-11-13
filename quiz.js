@@ -21,7 +21,10 @@ function opened(kind, key) { return typeof isOpen !== 'function' || isOpen(kind,
 function pickKeys(wrongKeys, allKeys) {
   const valid = new Set(allKeys)
   const keys = shuffle(wrongKeys.filter(k => valid.has(k))).slice(0, QUIZ_SIZE)
-  for (const k of shuffle(allKeys)) {
+  // 최근에 푼 문제는 뒤로 미룬다 (학년이 바뀌어도 같은 문제가 또 나오지 않게)
+  const recent = typeof recentKeys === 'function' ? recentKeys() : new Set()
+  const mixed = shuffle(allKeys)
+  for (const k of [...mixed.filter(k => !recent.has(k)), ...mixed.filter(k => recent.has(k))]) {
     if (keys.length >= QUIZ_SIZE) break
     if (!keys.includes(k)) keys.push(k)
   }
