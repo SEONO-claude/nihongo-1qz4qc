@@ -301,25 +301,9 @@ td .ko { display: block; color: var(--ink-2); font-size: 13px; }
 .school.locked .smark { background: var(--ink-3); box-shadow: 0 3px 0 var(--edge); }
 .school.locked .icon { color: var(--ink-3); width: 24px; height: 24px; }
 .reward { margin: 12px 0 8px; padding: 8px 12px; border-radius: 12px; background: var(--card); border: 2px dashed var(--line); font-size: 13px; color: var(--ink-2); }
-.path { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 16px 0 8px; }
-.node { position: relative; display: flex; flex-direction: column; align-items: center; transform: translateX(var(--x)); }
-.nodebtn {
-  width: 68px; height: 68px; border-radius: 50%; border: 0; display: grid; place-items: center;
-  font-family: var(--round); font-size: 26px; color: #fff; background: var(--c); box-shadow: 0 6px 0 var(--cd);
-  transition: transform 100ms var(--ease), box-shadow 100ms var(--ease);
-}
-.nodebtn:active:not(:disabled) { transform: translateY(4px); box-shadow: 0 2px 0 var(--cd); }
-.node.boss .nodebtn { width: 80px; height: 80px; font-family: var(--mincho); font-size: 34px; font-weight: 600; background: var(--sun); box-shadow: 0 6px 0 var(--sun-d); }
-.node.lock .nodebtn { background: var(--raised); color: var(--ink-3); box-shadow: 0 6px 0 var(--edge); }
-.node.lock .nodebtn .icon { width: 24px; height: 24px; }
-.node.clear .nodebtn { background: var(--c); }
-.node.here .nodebtn { animation: nodePulse 1.6s var(--ease) infinite; }
-.nname { margin-top: 10px; font-family: var(--round); font-size: 14px; color: var(--ink-2); }
 .stars { display: inline-flex; gap: 1px; font-size: 15px; line-height: 1; }
 .stars i { font-style: normal; color: var(--line); }
 .stars i.on { color: var(--sun); }
-.nodemascot { position: absolute; left: 76px; top: -6px; width: 64px; animation: hop 2.4s var(--ease) infinite; pointer-events: none; }
-.nodemascot img { width: 100%; height: auto; display: block; }
 @keyframes nodePulse { 0%, 100% { box-shadow: 0 6px 0 var(--cd), 0 0 0 0 var(--ct); } 50% { box-shadow: 0 6px 0 var(--cd), 0 0 0 10px var(--ct); } }
 
 /* 스테이지 중 위쪽 줄 */
@@ -973,10 +957,6 @@ body.quizzing .qcard > .q { flex: 1; display: flex; flex-direction: column; alig
 #kdetail, .feedback, .soundpanel { animation-timing-function: var(--ease); }
 .xpbadge b { color: var(--ink); font-weight: 400; }
 /* 퀘스트 칸 번호도 진한 분홍(흰 숫자 대비 5:1), 졸업 시험 칸은 노랑에 어두운 글씨 */
-.node .nodebtn, .node.clear .nodebtn { background: var(--pri); box-shadow: 0 6px 0 var(--pri-d); }
-.node .nodebtn:active:not(:disabled) { box-shadow: 0 2px 0 var(--pri-d); }
-.node.boss .nodebtn { background: var(--sun); box-shadow: 0 6px 0 var(--sun-d); color: var(--ink); }
-.node.lock .nodebtn { background: var(--raised); color: var(--ink-3); box-shadow: 0 6px 0 var(--edge); }
 
 /* ───── 성적(수·우·미) ───── */
 .gmark { display: inline-grid; place-items: center; min-width: 26px; height: 26px; margin-top: 4px; padding: 0 4px; border: 2px solid var(--pri-ink); border-radius: 6px; font-family: var(--round); font-size: 15px; line-height: 1; color: var(--pri-ink); transform: rotate(-6deg); }
@@ -988,6 +968,30 @@ body.quizzing .qcard > .q { flex: 1; display: flex; flex-direction: column; alig
 .biggrade.g1 span { border-color: var(--ink-2); color: var(--ink-2); }
 .biggrade small { font-size: 14px; color: var(--ink-2); }
 .levelup .lvbig { font-family: var(--round); }
-.nname { white-space: nowrap; }
 .biggrade span { --r: -10deg; }
-.nodebtn small { font-size: 15px; opacity: 0.85; margin-left: 1px; }
+
+/* ───── 퀘스트: 성적표 표 (줄 = 학년, 칸 = 1학기·2학기) ───── */
+.rtable { display: grid; gap: 0; margin: 12px 0 8px; border: 1.5px solid var(--line); border-radius: 12px; overflow: hidden; background: var(--card); }
+.rrow { display: grid; grid-template-columns: 76px 1fr 1fr; align-items: stretch; border-top: 1px solid var(--line); }
+.rrow:first-child { border-top: 0; }
+.rrow.rhead { background: var(--raised); }
+.rrow.rhead span { padding: 8px 0; text-align: center; font-size: 13px; color: var(--ink-2); }
+.rgrade { display: grid; place-items: center; font-family: var(--round); font-size: 15px; color: var(--ink-2); background: var(--raised); border-right: 1px solid var(--line); }
+.rcell { display: grid; place-items: center; min-height: 52px; border-radius: 0; box-shadow: none; padding: 6px; border: 0; border-left: 1px solid var(--line); background: transparent; color: var(--ink); font: inherit; cursor: pointer; }
+.rrow .rcell:nth-child(2) { border-left: 0; }
+.rcell:disabled { cursor: default; }
+.rcell.lock .icon { width: 18px; height: 18px; color: var(--ink-3); opacity: .7; }
+.rcell .gmark { margin-top: 0; }
+.rgo { font-family: var(--round); font-size: 15px; color: var(--pri-ink); }
+.rcell.here { background: var(--pri); }
+.rcell.here .rgo { color: #fff; }
+.rcell.here:active { background: var(--pri-d); }
+.rcell.open:active, .rcell.clear:active { background: var(--raised); }
+.rrow.rfinal { grid-template-columns: 1fr; background: var(--raised); }
+.rfinal .rcell { border-left: 0; grid-auto-flow: column; gap: 10px; min-height: 56px; }
+.rboss { font-family: var(--round); font-size: 16px; color: var(--ink); }
+.rboss span { font-family: var(--mincho); font-weight: 600; }
+.rfinal .rcell.here { background: var(--sun); }
+.rfinal .rcell.here .rgo { color: var(--ink); }
+.schoolcat { width: 48px; flex: none; }
+.schoolcat img { width: 100%; height: auto; display: block; }

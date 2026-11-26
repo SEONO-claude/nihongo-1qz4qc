@@ -1275,20 +1275,29 @@ function questView() {
     }
     const done = s.stages.filter(x => stageStars(x.id)).length
     const grad = done === s.stages.length
-    const nodes = s.stages.map((st, k) => {
-      const gi = first + k, open = stageUnlocked(gi), stars = stageStars(st.id), here = gi === cur && !grad
-      const cls = ['node', st.boss ? 'boss' : '', stars ? 'clear' : open ? 'open' : 'lock', here ? 'here' : ''].join(' ')
-      return `<div class="${cls}" style="--x:${Math.round(Math.sin(k * 1.2) * 64)}px">
-        ${here ? `<div class="nodemascot">${mascot('mascot', '')}</div>` : ''}
-        <button class="nodebtn" data-act="startStage" data-id="${st.id}" ${open ? '' : 'disabled'} aria-label="${s.name} ${st.name}">
-          ${open ? (st.boss ? '<span lang="ja">卒</span>' : parseInt(st.grade)) : LOCK}</button>
-        <span class="nname">${st.name}</span>${open ? starsHTML(stars) : ''}
-      </div>`
-    }).join('')
+    // 성적표 칸: 줄은 학년, 칸은 1학기·2학기. 졸업 시험은 맨 아래 한 줄
+    const cell = (st) => {
+      const gi = first + s.stages.indexOf(st), open = stageUnlocked(gi), stars = stageStars(st.id), here = gi === cur && !grad
+      const cls = ['rcell', stars ? 'clear' : here ? 'here' : open ? 'open' : 'lock'].join(' ')
+      const inner = stars ? starsHTML(stars) : here ? '<span class="rgo">시작</span>' : open ? '<span class="rgo">풀기</span>' : LOCK
+      const label = st.boss ? `${s.name} 졸업 시험` : `${s.name} ${st.name}`
+      return `<button class="${cls}" data-act="startStage" data-id="${st.id}" ${open ? '' : 'disabled'} aria-label="${label}${stars ? ' 성적 ' + gradeOf(stars) : ''}">${st.boss ? `<span class="rboss"><span lang="ja">卒</span> 졸업 시험</span>` : ''}${inner}</button>`
+    }
+    const grades = []
+    for (const st of s.stages) {
+      if (st.boss) continue
+      let row = grades.find(r => r.grade === st.grade)
+      if (!row) grades.push(row = { grade: st.grade, terms: [] })
+      row.terms[st.term - 1] = st
+    }
+    const boss = s.stages.find(st => st.boss)
+    const rows = grades.map(r => `<div class="rrow"><span class="rgrade">${r.grade}</span>${r.terms.map(cell).join('')}</div>`).join('')
+    const hereHere = !grad && curSt.school === s.id
     return `<section class="school${grad ? ' grad' : ''}" style="${color}">
       <div class="schoolhd"><span class="smark">${schoolIcon(s.id)}</span><div><b>${s.name}</b><small>${grad ? '졸업했어요' : `${done} / ${s.stages.length} 통과`}</small></div>
-        ${grad ? `<button class="gradbadge" data-act="reportCard" data-school="${s.id}">졸업 · 성적표</button>` : ''}</div>
-      <div class="path">${nodes}</div></section>`
+        ${grad ? `<button class="gradbadge" data-act="reportCard" data-school="${s.id}">졸업 · 성적표</button>` : hereHere ? `<span class="schoolcat">${mascot('mascot', '')}</span>` : ''}</div>
+      <div class="rtable"><div class="rrow rhead"><span></span><span>1학기</span><span>2학기</span></div>${rows}
+        ${boss ? `<div class="rrow rfinal">${cell(boss)}</div>` : ''}</div></section>`
   }).join('')
   return `
   <div class="questhead">${mascot('mascot')}<div><span class="lvchip">${rankName()}</span><h1>일본어 학교 퀘스트</h1>
