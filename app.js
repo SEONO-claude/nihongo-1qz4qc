@@ -22,6 +22,10 @@ function saveProgress() {
   try { localStorage.setItem(STORE_KEY, JSON.stringify(progress)) } catch { /* 저장이 막힌 브라우저 */ }
 }
 const progress = loadProgress()
+if (!progress.termsMig) {
+  for (const id of ['e1', 'e2', 'e3', 'e4', 'e5', 'e6', 'm1', 'm2', 'm3', 'h1', 'h2', 'h3']) if (progress.stages[id] && !progress.stages[id + 's']) progress.stages[id + 's'] = progress.stages[id]
+  progress.termsMig = true
+}
 
 // 오늘 한 공부 (날짜가 바뀌면 0부터)
 function todayStats() {
@@ -481,7 +485,7 @@ function homeView() {
   const nextSt = STAGES[currentStageIndex()]
   const allClear = STAGES.every(x => stageCleared(x.id))
   const lead = allClear ? `졸업 뒤 목표 · 마스터 별 ★ ${masterCount('g:')} / ${GRAMMAR.length}`
-    : `퀘스트 ${clearedCount()} / ${STAGES.length}칸 통과` + (s >= 2 ? ` · ${s}일 연속` : '')
+    : `퀘스트 ${clearedCount()} / ${STAGES.length}칸 통과` + (s >= 2 ? ` · 연속 출석 ${s}일` : '')
 
   // 다음 목표: 지금 스테이지를 통과하면 무엇이 열리는지
   const after = STAGES[currentStageIndex() + 1]
@@ -489,7 +493,7 @@ function homeView() {
   const prizes = after && !allClear ? [{ kind: 'stage', label: `퀘스트 ${schoolOf(after.school).name} ${after.name}` }, ...(prizeCat ? [{ kind: 'cat', label: `새 친구 고양이` }] : []), ...unlocksAt(after.id)] : []
   const nextGoal = allClear ? '' : `
   <div class="panel nextgoal">
-    <div class="eyebrow">다음 목표 <span class="num">· Lv.${playerLevel() + 1}까지 · 퀘스트 ${clearedCount()} / ${STAGES.length}</span></div>
+    <div class="eyebrow">다음 목표 <span class="num">· 퀘스트 ${clearedCount()} / ${STAGES.length}칸</span></div>
     <div class="ngmain"><span class="smark">${schoolIcon(nextSt.school)}</span>
       <div><b>${schoolOf(nextSt.school).name} ${nextSt.name} 통과하기</b><small>${stageSize(nextSt)}문제 중 ${passNeed(nextSt)}개 이상 맞히면 통과</small></div>
       <button class="btn pri" data-act="questContinue">도전</button></div>
@@ -500,7 +504,7 @@ function homeView() {
   const goal = (label, n, max, c) => `<div class="goal${n >= max ? ' done' : ''}" style="--c:${c}">
     <span>${label}${n >= max ? check : ''}</span><span class="num">${Math.min(n, max)} / ${max}</span>
     <div class="bar"><i style="width:${Math.min(n, max) / max * 100}%"></i></div></div>`
-  const hello = t.solved > 0 ? `오늘 ${t.solved}문제 풀었어요` : s >= 2 ? `${s}일 연속이에요` : '같이 공부해요'
+  const hello = t.solved > 0 ? `오늘 ${t.solved}문제 풀었어요` : s >= 2 ? `연속 출석 ${s}일째예요` : '같이 공부해요'
   const main = allClear ? '<button class="btn pri" data-act="startFix">오늘의 교정 10문제</button>' : '<button class="btn pri" data-act="questContinue">퀘스트 계속</button>'
   const second = !progress.placed && clearedCount() < 3 ? '<button class="btn" data-act="startPlace">실력 진단</button>'
     : allClear ? '<button class="btn" data-go="quiz">퀘스트 지도</button>' : '<button class="btn" data-act="startFix">교정 10문제</button>'
@@ -511,7 +515,7 @@ function homeView() {
     <button class="hero-mascot${state.catHop ? ' hop' : ''}" data-act="petCat" aria-label="${buddy().name} 쓰다듬기">${mascot(state.catHop ? 'cheer' : 'mascot', '')}<span class="says">${state.catSay || hello}</span></button>
     <div class="hero-text">
       <span class="hero-date">${date} ${weekday}</span>
-      <span class="lvchip"><b class="num">Lv.${playerLevel()}</b>${rankName()}</span>
+      <span class="lvchip">${rankName()}</span>
       <h1>오늘의 공부</h1>
       <p>${lead}</p>
       ${!progress.placed && clearedCount() < 3 ? '<p class="placehint">이미 일본어를 조금 안다면, 실력 진단으로 시작 학년을 건너뛰세요</p>' : ''}
@@ -547,11 +551,11 @@ function meView() {
   return `
   <div class="mehead">
     <img src="${catImage(b)}" alt="${b.name}" width="400" height="400">
-    <div><span class="lvchip"><b class="num">Lv.${playerLevel()}</b>${rankName()}</span><h1>내 정보</h1>
-      <p>별 <b class="num">${totalStars()}</b> · 총 <b class="num">${progress.xp || 0}</b> XP · 연속 <b class="num">${s}</b>일 · 단짝 ${b.name}</p></div>
+    <div><span class="lvchip">${rankName()}</span><h1>내 정보</h1>
+      <p>성적 수 <b class="num">${gradeCount(3)}</b>칸 · 연속 출석 <b class="num">${s}</b>일 · 단짝 ${b.name}</p></div>
   </div>
-  <div class="panel stampcard"><div class="eyebrow">공부 도장 <span class="num">· 최근 14일</span></div><div class="stampgrid">${cells}</div>
-    <div class="hint">카드를 보거나 문제를 풀면 그날 도장이 찍혀요</div></div>
+  <div class="panel stampcard"><div class="eyebrow">출석부 <span class="num">· 최근 14일</span></div><div class="stampgrid">${cells}</div>
+    <div class="hint">카드를 보거나 문제를 풀면 그날 출석 도장이 찍혀요</div></div>
   <div class="panel">
     <div class="hd">전체 기록</div>
     ${bar('마스터한 문법 ★', masterCount('g:'), GRAMMAR.length)}
@@ -984,7 +988,7 @@ function grammarView() {
 // 쓰다듬으면 하는 말 (성격마다 조금씩 다르게)
 const CAT_LINES = {
   mike: ['헷갈리는 건 내가 기억해 둘게요', '한 교시만 하고 가요', '어제 틀린 거, 오늘은 맞힐 거예요', '같이 하면 금방이에요'],
-  kuro: ['흥, 오늘도 왔네요', '틀린 문제는 다 적어 뒀어요', '조금만 더 하면 별 세 개예요'],
+  kuro: ['흥, 오늘도 왔네요', '틀린 문제는 다 적어 뒀어요', '조금만 더 하면 수예요'],
   shiro: ['천천히 해도 괜찮아요', '오늘 공부, 반짝반짝 빛났어요', '쉬었다 가도 돼요'],
   mikan: ['한 판 더 가요', '정답 맞히면 점프할 거예요', '오늘 기운 넘쳐요'],
   moka: ['헷갈리는 짝부터 정리해 봐요', '오늘은 복습부터 어때요', '차분히 하나씩요'],
@@ -1043,12 +1047,12 @@ function buildFixQuiz() {
 }
 // 실력 진단(월반 시험): 단계마다 한자 1 + 문법 1, 연속으로 둘 다 맞힌 단계까지 건너뛴다
 const PLACE_TIERS = [
-  { kanji: 2, lv: 'N5', to: 'e3', label: '초등학교 3학년' },
-  { kanji: 4, lv: 'N4', to: 'e5', label: '초등학교 5학년' },
-  { kanji: 6, lv: 'N4', to: 'm1', label: '중학교 1학년' },
-  { kanji: 8, lv: 'N3', to: 'm3', label: '중학교 3학년' },
-  { kanji: 9, lv: 'N3', to: 'h1', label: '고등학교 1학년' },
-  { kanji: 11, lv: 'N2', to: 'h3', label: '고등학교 3학년' },
+  { kanji: 2, lv: 'N5', to: 'e3', label: '초등학교 3학년 1학기' },
+  { kanji: 4, lv: 'N4', to: 'e5', label: '초등학교 5학년 1학기' },
+  { kanji: 6, lv: 'N4', to: 'm1', label: '중학교 1학년 1학기' },
+  { kanji: 8, lv: 'N3', to: 'm3', label: '중학교 3학년 1학기' },
+  { kanji: 9, lv: 'N3', to: 'h1', label: '고등학교 1학년 1학기' },
+  { kanji: 11, lv: 'N2', to: 'h3', label: '고등학교 3학년 1학기' },
 ]
 function buildPlacement() {
   const out = []
@@ -1066,7 +1070,7 @@ function applyPlacement(qz) {
     if (qs.length && qs.every(q => !qz.missed.includes(q))) reached = ti; else break
   }
   progress.placed = true
-  if (reached < 0) { saveProgress(); return { label: '초등학교 1학년', skipped: 0 } }
+  if (reached < 0) { saveProgress(); return { label: '초등학교 1학년 1학기', skipped: 0 } }
   const t = PLACE_TIERS[reached], idx = stageIndex(t.to)
   let skipped = 0
   for (let i = 0; i < idx; i++) if (!stageCleared(STAGES[i].id)) { progress.stages[STAGES[i].id] = 1; skipped++ }
@@ -1076,7 +1080,7 @@ function applyPlacement(qz) {
 }
 function placeResultHTML(p) {
   return `<div class="mockres pass"><div class="mockscore"><b>${p.label}</b></div>
-    <p>${p.skipped ? `${p.skipped}칸을 건너뛰고 여기서 시작해요 · 건너뛴 칸은 별 1개로 채워 두었어요` : '처음부터 차근차근 시작해요'}</p>
+    <p>${p.skipped ? `${p.skipped}칸을 건너뛰고 여기서 시작해요 · 건너뛴 칸은 성적 「미」로 채워 두었어요` : '처음부터 차근차근 시작해요'}</p>
     <div class="actions"><button class="btn pri" data-act="questContinue">여기서 시작</button></div></div>`
 }
 
@@ -1105,10 +1109,10 @@ function todayMissions() {
 }
 function missionsHTML(t, goal) {
   const ms = todayMissions(), done = ms.filter(m => m.get(t) >= m.need).length
-  const chest = t.chest ? `<div class="chestrow open"><span class="chest" lang="ja">宝</span><span>보물상자를 열었어요 · <b class="num">+${t.chest} XP</b></span></div>`
-    : done === ms.length ? `<div class="chestrow ready"><span class="chest shake" lang="ja">宝</span><button class="btn pri" data-act="openChest">보물상자 열기</button></div>`
-    : `<div class="chestrow"><span class="chest locked" lang="ja">宝</span><span>미션 3개를 마치면 보물상자가 열려요</span></div>`
-  return `<div class="panel goals"><div class="eyebrow">오늘의 미션 <span class="num">· ${done} / ${ms.length}</span></div>
+  const chest = t.chest ? `<div class="chestrow open"><span class="chest" lang="ja">花</span><span>선생님 도장을 받았어요 · <b class="num">+${t.chest} XP</b></span></div>`
+    : done === ms.length ? `<div class="chestrow ready"><span class="chest shake" lang="ja">花</span><button class="btn pri" data-act="openChest">숙제 검사 받기</button></div>`
+    : `<div class="chestrow"><span class="chest locked" lang="ja">花</span><span>숙제 3개를 다 하면 선생님이 도장을 찍어 줘요</span></div>`
+  return `<div class="panel goals"><div class="eyebrow">오늘의 숙제 <span class="num">· ${done} / ${ms.length}</span></div>
     ${ms.map(m => goal(m.label, m.get(t), m.need, m.c)).join('')}${chest}</div>`
 }
 function dueKeys() {
@@ -1161,18 +1165,19 @@ async function showReportCard(schoolId) {
   g.fillStyle = '#3a2e1f'; g.textAlign = 'center'
   g.font = '700 110px "Noto Serif JP", "Yu Mincho", serif'; g.fillText('成績表', W / 2, 230)
   g.font = '48px Jua, sans-serif'; g.fillText(`${sc.name} 일본어 성적표`, W / 2, 310)
-  g.font = '34px Jua, sans-serif'; g.fillStyle = '#8b6d3f'; g.fillText(`Lv.${playerLevel()} · ${rankName()}`, W / 2, 370)
-  // 학년별 별
+  g.font = '34px Jua, sans-serif'; g.fillStyle = '#8b6d3f'; g.fillText(rankName(), W / 2, 370)
+  // 학년마다 한 줄: 1학기 · 2학기 성적 (졸업 시험은 한 칸)
   g.textAlign = 'left'
-  stages.forEach((st, i) => {
-    const y = 480 + i * 84, n = progress.stages[st.id] || 0
-    g.fillStyle = '#3a2e1f'; g.font = '44px Jua, sans-serif'; g.fillText(st.name, 150, y)
-    g.font = '58px sans-serif'
-    for (let k = 0; k < 3; k++) { g.fillStyle = k < n ? '#ffc23c' : '#e8dcc6'; g.fillText('★', 620 + k * 80, y + 6) }
+  const rows = []
+  for (const st of stages) { const key = st.grade || st.name, row = rows.find(x => x.key === key); row ? row.list.push(st) : rows.push({ key, list: [st] }) }
+  rows.forEach((row, i) => {
+    const y = 480 + i * 84
+    g.fillStyle = '#3a2e1f'; g.font = '44px Jua, sans-serif'; g.fillText(row.key, 150, y)
+    row.list.forEach((st, k) => { const n = progress.stages[st.id] || 0; g.font = '50px Jua, sans-serif'; g.fillStyle = n ? '#c9365f' : '#e2d6c2'; g.fillText(n ? gradeOf(n) : '·', 620 + k * 110, y + 4) })
   })
-  const y0 = 480 + (stages.length - 1) * 84 + 140
+  const y0 = 480 + (rows.length - 1) * 84 + 140
   g.strokeStyle = '#e2c88f'; g.lineWidth = 2; g.beginPath(); g.moveTo(150, y0 - 50); g.lineTo(W - 150, y0 - 50); g.stroke()
-  const stats = [['모은 별', `${totalStars()} / ${STAGES.length * 3}`], ['총 경험치', `${progress.xp || 0} XP`], ['마스터한 문법', `${masterCount('g:')}개`], ['마스터한 한자', `${masterCount('k:')}개`], ['배지', `${progress.badges.length} / ${BADGES.length}`]]
+  const stats = [['성적 수', `${gradeCount(3)} / ${STAGES.length}칸`], ['총 경험치', `${progress.xp || 0} XP`], ['마스터한 문법', `${masterCount('g:')}개`], ['마스터한 한자', `${masterCount('k:')}개`], ['배지', `${progress.badges.length} / ${BADGES.length}`]]
   stats.forEach(([k, v], i) => { const y = y0 + i * 64; g.fillStyle = '#8b6d3f'; g.font = '38px Jua, sans-serif'; g.fillText(k, 150, y); g.fillStyle = '#3a2e1f'; g.textAlign = 'right'; g.fillText(v, 640, y); g.textAlign = 'left' })
   if (cat) g.drawImage(cat, W - 440, y0 - 40, 340, 340)
   // 도장
@@ -1255,7 +1260,7 @@ function schoolIcon(id) { return SCHOOL_ICON[id] || SCHOOL_ICON.elem }
 
 const PAW = '<svg class="pawsvg" viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="15.6" rx="5.2" ry="4.3"/><ellipse cx="5.9" cy="10.2" rx="2.1" ry="2.5" transform="rotate(-18 5.9 10.2)"/><ellipse cx="9.7" cy="6.6" rx="2.2" ry="2.7" transform="rotate(-6 9.7 6.6)"/><ellipse cx="14.3" cy="6.6" rx="2.2" ry="2.7" transform="rotate(6 14.3 6.6)"/><ellipse cx="18.1" cy="10.2" rx="2.1" ry="2.5" transform="rotate(18 18.1 10.2)"/></svg>'
 const LOCK = '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 11V7a5 5 0 0 1 10 0v4 M5 11h14v10H5z"/></svg>'
-function starsHTML(n) { return `<span class="stars" aria-label="별 ${n}개">${[1, 2, 3].map(k => `<i class="${k <= n ? 'on' : ''}">★</i>`).join('')}</span>` }
+function starsHTML(n) { return n ? `<span class="gmark g${n}" aria-label="성적 ${gradeOf(n)}">${gradeOf(n)}</span>` : '' }
 
 function questView() {
   const cur = currentStageIndex(), curSt = STAGES[cur], curSc = schoolOf(curSt.school)
@@ -1276,7 +1281,7 @@ function questView() {
       return `<div class="${cls}" style="--x:${Math.round(Math.sin(k * 1.2) * 64)}px">
         ${here ? `<div class="nodemascot">${mascot('mascot', '')}</div>` : ''}
         <button class="nodebtn" data-act="startStage" data-id="${st.id}" ${open ? '' : 'disabled'} aria-label="${s.name} ${st.name}">
-          ${open ? (st.boss ? '<span lang="ja">卒</span>' : k + 1) : LOCK}</button>
+          ${open ? (st.boss ? '<span lang="ja">卒</span>' : parseInt(st.grade)) : LOCK}</button>
         <span class="nname">${st.name}</span>${open ? starsHTML(stars) : ''}
       </div>`
     }).join('')
@@ -1286,8 +1291,8 @@ function questView() {
       <div class="path">${nodes}</div></section>`
   }).join('')
   return `
-  <div class="questhead">${mascot('mascot')}<div><span class="lvchip"><b class="num">Lv.${playerLevel()}</b>${rankName()}</span><h1>일본어 학교 퀘스트</h1>
-    <p>모은 별 <b class="num">${totalStars}</b> / ${STAGES.length * 3} · 배지 <b class="num">${progress.badges.length}</b> / ${BADGES.length}</p></div></div>
+  <div class="questhead">${mascot('mascot')}<div><span class="lvchip">${rankName()}</span><h1>일본어 학교 퀘스트</h1>
+    <p>성적 수 <b class="num">${gradeCount(3)}</b> · 우 <b class="num">${gradeCount(2)}</b> · 미 <b class="num">${gradeCount(1)}</b> · 배지 <b class="num">${progress.badges.length}</b> / ${BADGES.length}</p></div></div>
   <div class="questbar"><button class="btn pri" data-act="questContinue">이어서 도전</button><button class="btn" data-act="quizTab" data-tab="free">자유 연습</button></div>
   ${schools}
   <section class="panel catbox">
@@ -1326,14 +1331,14 @@ function stageDoneView() {
       ${qz.right === total ? hanamaruSVG() : ''}
       ${mascot(qz.graduated ? 'party' : passed ? 'cheer' : 'sad')}
       <p>${qz.graduated ? (sc.id === 'high' ? '미묘한 일본어, 졸업' : `${sc.name} 졸업을 축하해요`) : passed ? `${st.name} 통과` : `${stageSize(st)}문제 중 ${passNeed(st)}개 이상 맞히면 통과예요`}</p>
-      <div class="bigstars">${[1, 2, 3].map(k => `<i class="${k <= qz.stars ? 'on' : ''}" style="--d:${k * 220}ms">★</i>`).join('')}</div>
+      ${qz.stars ? `<div class="biggrade g${qz.stars}"><span>${gradeOf(qz.stars)}</span><small>${['', '통과', '하나 틀림', '모두 정답'][qz.stars]}</small></div>` : ''}
       <div class="stats">
         <div class="stat"><b class="num">${qz.right} / ${total}</b><small>맞힌 문제</small></div>
         <div class="stat"><b class="num">+${qz.xp}</b><small>얻은 XP</small></div>
         <div class="stat"><b class="num">${qz.best}</b><small>최고 연속</small></div>
       </div>
     </div>
-    ${qz.levelUp ? `<div class="levelup"><span class="lvbig num">Lv.${qz.levelUp}</span><span>레벨 업 · ${rankName()}</span></div>` : ''}
+    ${qz.levelUp ? `<div class="levelup"><span class="lvbig">진급</span><span>${rankName()}</span></div>` : ''}
     ${diploma}
     ${qz.graduated && sc.id !== 'high' ? `<div class="newcat grow"><div class="eyebrow">${sc.id === 'elem' ? '중학생이 됐어요' : '고등학생이 됐어요'}</div>
       <img src="${catImage(buddy())}" alt="${buddy().name}" width="400" height="400">
@@ -1662,7 +1667,7 @@ const ACTIONS = {
   meExport() { exportProgress(); return true },
   meImport() { document.getElementById('importfile')?.click(); return true },
   meReset() {
-    if (!confirm('모든 공부 기록을 지울까요?\n별, 고양이 친구, 배지, 복습 기록이 모두 사라지고 되돌릴 수 없어요')) return true
+    if (!confirm('모든 공부 기록을 지울까요?\n성적, 고양이 친구, 배지, 복습 기록이 모두 사라지고 되돌릴 수 없어요')) return true
     if (!confirm('정말 지울까요? 먼저 "기록 내보내기"로 저장해 두는 걸 권해요')) return true
     try { localStorage.removeItem(STORE_KEY) } catch { /* 무시 */ }
     location.reload(); return true
@@ -1884,7 +1889,7 @@ function showOpening() {
     </div>
     <h1 class="op-title">${[...title].map((c, i) => c === ' ' ? '<span class="sp"> </span>' : `<span style="--i:${i}">${c}</span>`).join('')}</h1>
     <p class="op-tag">뜻은 알죠. 읽는 법만 고쳐요</p>
-    <p class="op-sub"><span class="lvchip"><b class="num">Lv.${playerLevel()}</b>${rankName()}</span>${s >= 2 ? `<span class="op-streak">${s}일 연속</span>` : ''}</p>
+    <p class="op-sub"><span class="lvchip">${rankName()}</span>${s >= 2 ? `<span class="op-streak">연속 출석 ${s}일</span>` : ''}</p>
     <div class="op-btns"><button class="btn pri op-start" data-snd="on">소리 켜고 시작</button><button class="btn op-quiet" data-snd="off">조용히 시작</button></div>`
   document.body.appendChild(el)
   document.documentElement.classList.add('opening')

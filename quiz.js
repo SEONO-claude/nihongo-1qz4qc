@@ -97,6 +97,20 @@ const SCHOOLS = [
       { id: 'hf', name: '졸업 시험', boss: true, parts: [{ t: 'hkanji', sets: ['jukuji', 'yoji', 'nandoku'], n: 8 }, { t: 'verb', level: 'high', n: 6 }, { t: 'grammar', levels: ['N2', 'N1'], n: 6 }] },
     ] },
 ]
+// 학년마다 1학기·2학기 두 칸: 1학기는 원래 id(e1), 2학기는 id에 s를 붙인다(e1s).
+// 그 학년 한자(고등은 특별한 읽기 낱말)를 앞 절반·뒤 절반으로 나눠 배우고, 숫자 읽기 묶음도 나눈다.
+function splitPart(p, term) {
+  if (p.t === 'kanji' || p.t === 'hkanji') return { ...p, half: term - 1 }
+  if (p.t === 'num' && Array.isArray(p.groups) && p.groups.length > 1) {
+    const m = Math.ceil(p.groups.length / 2)
+    return { ...p, groups: term === 1 ? p.groups.slice(0, m) : p.groups.slice(m) }
+  }
+  return p
+}
+for (const sc of SCHOOLS) sc.stages = sc.stages.flatMap(st => st.boss ? [st] : [1, 2].map(term => ({
+  ...st, id: term === 1 ? st.id : st.id + 's', grade: st.name, term, name: `${st.name} ${term}학기`,
+  parts: st.parts.map(p => splitPart(p, term)),
+})))
 const STAGES = SCHOOLS.flatMap(s => s.stages.map(st => ({ ...st, school: s.id })))
 const PASS = 8   // 10문제 중 8개 이상이면 통과 (졸업 시험 20문제는 16개)
 function stageSize(st) { return st.parts.reduce((n, p) => n + p.n, 0) }
@@ -145,6 +159,7 @@ function partQuestions(part, wrong) {
   let keys = [], make
   if (part.t === 'hkanji') {
     keys = highKanjiKeys(part.sets)
+    if (part.half != null) keys = keys.filter(k => { const [, s, i] = k.split(':'); const m = Math.ceil(HIGH_KANJI[s].length / 2); return part.half ? Number(i) >= m : Number(i) < m })
     if (keys.length) return pickKeys(wrong.kanji, keys).slice(0, part.n).map(makeHighKanjiQuestion)
     part = { t: 'kanji', grades: [7, 8, 9], n: part.n }   // 데이터가 없을 때
   }
@@ -152,6 +167,7 @@ function partQuestions(part, wrong) {
     const maxGrade = Math.max(...part.grades)
     let pool = Object.keys(KANJI).filter(c => part.grades.includes(KANJI[c].grade))
     if (!pool.length) pool = Object.keys(KANJI).filter(c => KANJI[c].grade >= 4 && KANJI[c].grade <= 6)   // 중학 한자가 아직 없을 때
+    if (part.half != null && part.grades.length === 1) { const m = Math.ceil(pool.length / 2); pool = part.half ? pool.slice(m) : pool.slice(0, m) }
     keys = pool.flatMap(c => [`m:${c}`, ...readIndexes(c, maxGrade).map(i => `r:${c}:${i}`)])
     make = k => { const q = k.startsWith('r:') ? makeReadQuestion(k, pool) : makeMeaningQuestion(k, pool); q.mode = 'kanji'; return q }
     return pickKeys(wrong.kanji, keys).slice(0, part.n).map(make)
@@ -241,6 +257,8 @@ function makeMeaningQuestion(key, pool) {
   for (const e of useEx) if (e[0] !== w && e[1] !== r && !picks.includes(e[0])) picks.push(e[0])
   const others = shuffle(pool.filter(x => x !== c).flatMap(x => KANJI[x].examples).filter(e => e[1] !== r && fit(e[0]) && Math.abs(e[0].length - w.length) <= 1))
   for (const e of others) { if (picks.length >= 4) break; if (!picks.includes(e[0])) picks.push(e[0]) }
+  // 그래도 모자라면 길이 제한 없이, 그 학년까지의 모든 한자 낱말에서 채운다
+  if (picks.length < 4) for (const e of shuffle(Object.keys(KANJI).filter(x => x !== c && KANJI[x].grade <= k.grade).flatMap(x => KANJI[x].examples).filter(e => e[1] !== r && fit(e[0])))) { if (picks.length >= 4) break; if (!picks.includes(e[0])) picks.push(e[0]) }
   const rest = ex.filter(e => e[0] !== w).map(e => `${e[0]}(${e[1]})`).join(' · ')
   return {
     key,
