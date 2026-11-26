@@ -995,3 +995,18 @@ body.quizzing .qcard > .q { flex: 1; display: flex; flex-direction: column; alig
 .rfinal .rcell.here .rgo { color: var(--ink); }
 .schoolcat { width: 48px; flex: none; }
 .schoolcat img { width: 100%; height: auto; display: block; }
+
+/* 결석계: 쉰 날도 연속 출석이 이어졌다는 표시 (도장보다 흐리게) */
+.stamp.excuse { border-style: dashed; border-color: var(--ink-3); color: var(--ink-3); font-family: var(--round); font-weight: 400; opacity: .8; }
+
+/* 쪽지 시험 · 잘못 알던 답 · 복학 환영 */
+.rvcard.due { border-color: var(--pri); }
+.feedback .fnote { display: block; margin-top: 6px; font-size: 13px; line-height: 1.45; opacity: .85; }
+.feedback.sure .ftext b { color: var(--pri-ink); }
+.surefixed { display: flex; align-items: baseline; gap: 8px; margin: 12px 0; padding: 12px 16px; border-radius: 12px; background: var(--raised); }
+.surefixed b { font-family: var(--round); font-size: 22px; font-weight: 400; color: var(--pri-ink); }
+.surefixed span { font-size: 14px; color: var(--ink-2); }
+.backcard { padding: 16px 18px; }
+.backcard b { display: block; margin: 4px 0; font-family: var(--round); font-size: 22px; font-weight: 400; }
+.backcard p { margin: 0 0 12px; font-size: 14px; color: var(--ink-2); line-height: 1.5; }
+.backcard .btn { width: 100%; }

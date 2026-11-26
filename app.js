@@ -264,11 +264,23 @@ function centerOf(el) {
 const GOAL = { cards: 10, quizzes: 1 }
 
 // 연속으로 공부한 날 (오늘 아직 안 했으면 어제까지 센다)
-function streak() {
-  const days = new Set(progress.studyDays)
-  let n = 0, i = days.has(todayStr()) ? 0 : -1
-  while (days.has(todayStr(i))) { n++; i-- }
-  return n
+// 결석계: 7일에 한 번은 하루를 쉬어도 연속 출석이 이어진다. 끊겨서 아예 그만두는 일을 막으려고
+function streakInfo() {
+  const days = new Set(progress.studyDays), excused = []
+  let n = 0, i = days.has(todayStr()) ? 0 : -1, lastGap = null
+  for (let guard = 0; guard < 120; guard++) {
+    if (days.has(todayStr(i))) { n++; i--; continue }
+    if (days.has(todayStr(i - 1)) && (lastGap === null || lastGap - i >= 7)) { excused.push(todayStr(i)); lastGap = i; i--; continue }
+    break
+  }
+  return { n, excused }
+}
+function streak() { return streakInfo().n }
+// 마지막으로 공부한 날부터 며칠 지났는지 (오늘 했으면 0)
+function daysAway() {
+  if (!progress.studyDays.length || progress.studyDays.includes(todayStr())) return 0
+  const last = progress.studyDays.slice().sort().pop()
+  return Math.round((new Date(todayStr()) - new Date(last)) / 86400000)
 }
 
 // 오늘의 한자: 날마다 하나씩, 1학년 교과서 순서부터 차례로
@@ -330,6 +342,7 @@ function newQuiz() {
   const list = state.quizMode === 'stage' ? buildStageQuiz(STAGES.find(s => s.id === state.stage), wrong)
     : state.quizMode === 'kanji' ? buildKanjiQuiz(state.quizGrade, progress.wrongKanji)
     : state.quizMode === 'review' ? dueKeys().slice(0, 10).map(questionFromKey).filter(Boolean)
+    : state.quizMode === 'mini' ? buildMini(wrong)
     : state.quizMode === 'fix' ? buildFixQuiz()
     : state.quizMode === 'place' ? buildPlacement()
     : state.quizMode === 'mock' ? buildMock(state.mockLevel)
@@ -338,7 +351,20 @@ function newQuiz() {
     : state.quizMode === 'talk' ? buildTalkQuiz(state.talkQuiz || 'all', progress.wrongTalk)
     : state.quizMode === 'grammar' ? buildGrammarQuiz(state.quizLevel, progress.savedGrammar, progress.wrongGrammar)
     : buildVerbQuiz(progress.wrong, state.verbQuizLevel)
-  state.quiz = { list, i: 0, picked: null, right: 0, missed: [], combo: 0, best: 0, xp: 0, built: [] }
+  state.quiz = { list, i: 0, picked: null, right: 0, missed: [], combo: 0, best: 0, xp: 0, built: [], fixedSure: 0, qStart: Date.now() }
+}
+// 2분 수업: 쪽지 시험 2문제 + 지금 학기 문제로 5문제. 마지막은 맞혀 본 적 있는 문제로 (끝이 좋으면 기억도 좋게 남는다)
+// 복학(오래 쉬고 돌아옴)이면 쪽지 시험은 1문제, 학기 문제는 바로 앞 학기에서 쉽게
+function buildMini(wrong) {
+  const seen = new Set(), out = []
+  const add = q => { if (q && !seen.has(q.key) && out.length < 5) { seen.add(q.key); out.push(q) } }
+  dueKeys().slice(0, state.miniBack ? 1 : 2).forEach(k => add(questionFromKey(k)))
+  const idx = currentStageIndex(), st = state.miniBack && idx > 0 ? STAGES[idx - 1] : STAGES[idx]
+  buildStageQuiz(st, wrong).forEach(add)
+  const ms = progress.master || {}
+  const easy = out.findIndex((q, i) => i < out.length - 1 && (ms[masterItem(q.key)] || 0) >= 1)
+  if (easy >= 0) out.push(out.splice(easy, 1)[0])
+  return out
 }
 
 // lucide 아이콘 (16px, 선 1.5)
@@ -407,7 +433,7 @@ function quizBusy() {
   const qz = state.quiz
   return state.view === 'quiz' && qz && qz.list.length && qz.i > 0 && qz.i < qz.list.length && (SPECIAL.includes(state.quizMode) || state.quizTab === 'free')
 }
-const SPECIAL = ['stage', 'review', 'mock', 'fix', 'place']
+const SPECIAL = ['stage', 'review', 'mock', 'fix', 'place', 'mini']
 function go(view, fromHistory) {
   if (view !== state.view && quizBusy() && !confirm('퀴즈를 그만둘까요?\n지금까지 푼 문제는 기록돼요')) { if (fromHistory) history.pushState({ v: state.view }, ''); return }
   if (!fromHistory && view !== state.view) history.pushState({ v: view }, '')
@@ -504,10 +530,11 @@ function homeView() {
   const goal = (label, n, max, c) => `<div class="goal${n >= max ? ' done' : ''}" style="--c:${c}">
     <span>${label}${n >= max ? check : ''}</span><span class="num">${Math.min(n, max)} / ${max}</span>
     <div class="bar"><i style="width:${Math.min(n, max) / max * 100}%"></i></div></div>`
-  const hello = t.solved > 0 ? `오늘 ${t.solved}문제 풀었어요` : s >= 2 ? `연속 출석 ${s}일째예요` : '같이 공부해요'
+  const away = daysAway(), dueN = dueKeys().length
+  const hello = away >= 3 ? '다시 와 줘서 반가워요' : t.solved > 0 ? `오늘 ${t.solved}문제 풀었어요` : s >= 2 ? `연속 출석 ${s}일째예요` : '같이 공부해요'
   const main = allClear ? '<button class="btn pri" data-act="startFix">오늘의 교정 10문제</button>' : '<button class="btn pri" data-act="questContinue">퀘스트 계속</button>'
   const second = !progress.placed && clearedCount() < 3 ? '<button class="btn" data-act="startPlace">실력 진단</button>'
-    : allClear ? '<button class="btn" data-go="quiz">퀘스트 지도</button>' : '<button class="btn" data-act="startFix">교정 10문제</button>'
+    : '<button class="btn" data-act="startMini">2분 수업</button>'
 
   return `
   <section class="hero">
@@ -522,10 +549,14 @@ function homeView() {
       <div class="hero-actions">${main}${second}</div>
     </div>
   </section>
+  ${away >= 3 ? `<div class="panel backcard"><div class="eyebrow">복학 환영</div>
+    <b>${away}일 만이에요</b><p>쉬었다 와도 괜찮아요. 앞 학기 문제로 5문제만 가볍게 풀어 봐요</p>
+    <button class="btn pri" data-act="startMini" data-back="1">다시 시작 · 5문제</button></div>` : ''}
+  ${dueN ? reviewCardHTML() : ''}
   ${correctionCardHTML()}
   ${missionsHTML(t, goal)}
   ${nextGoal}
-  <div class="homegrid">${reviewCardHTML()}${mockCardHTML()}</div>
+  <div class="homegrid">${dueN ? '' : reviewCardHTML()}${mockCardHTML()}</div>
   <div class="panel">
     <button class="hd hdlink" data-go="me">나의 기록<span>전체 보기 ›</span></button>
     ${bar('마스터한 문법 ★', masterCount('g:'), GRAMMAR.length)}
@@ -542,10 +573,10 @@ function meView() {
   const allK = progress.seenKanji.filter(c => KANJI[c]).length
   const kanjiQ = Object.values(KANJI).reduce((n, k) => n + 1 + k.examples.length, 0) + highKanjiKeys(Object.keys(HK_SETS)).length
   const wrong = progress.wrong.length + progress.wrongKanji.length + progress.wrongGrammar.length
-  const days = new Set(progress.studyDays)
+  const days = new Set(progress.studyDays), excused = new Set(streakInfo().excused)
   const cells = Array.from({ length: 14 }, (_, n) => {
     const day = todayStr(n - 13), d = new Date(day)
-    return `<span class="stampcell${n === 13 ? ' today' : ''}" title="${day}"><span class="stampday num">${d.getDate()}</span>${days.has(day) ? `<span class="stamp" lang="ja" style="--r:${((d.getDate() * 37) % 21) - 10}deg">済</span>` : ''}</span>`
+    return `<span class="stampcell${n === 13 ? ' today' : ''}" title="${day}"><span class="stampday num">${d.getDate()}</span>${days.has(day) ? `<span class="stamp" lang="ja" style="--r:${((d.getDate() * 37) % 21) - 10}deg">済</span>` : excused.has(day) ? '<span class="stamp excuse" aria-label="결석계">결</span>' : ''}</span>`
   }).join('')
   const b = buddy()
   return `
@@ -555,7 +586,7 @@ function meView() {
       <p>성적 수 <b class="num">${gradeCount(3)}</b>칸 · 연속 출석 <b class="num">${s}</b>일 · 단짝 ${b.name}</p></div>
   </div>
   <div class="panel stampcard"><div class="eyebrow">출석부 <span class="num">· 최근 14일</span></div><div class="stampgrid">${cells}</div>
-    <div class="hint">카드를 보거나 문제를 풀면 그날 출석 도장이 찍혀요</div></div>
+    <div class="hint">카드를 보거나 문제를 풀면 그날 출석 도장이 찍혀요 · 일주일에 하루는 쉬어도 결석계로 연속 출석이 이어져요</div></div>
   <div class="panel">
     <div class="hd">전체 기록</div>
     ${bar('마스터한 문법 ★', masterCount('g:'), GRAMMAR.length)}
@@ -1095,7 +1126,7 @@ const MISSIONS = [
   { id: 'scene1', label: '회화 장면 하나 열어 보기', need: 1, get: t => t.scenes || 0, c: 'var(--mint)' },
   { id: 'grammar3', label: '문법 3개 펼쳐 보기', need: 3, get: t => t.grammar, c: 'var(--mint)' },
   { id: 'stage1', label: '퀘스트 한 칸 통과하기', need: 1, get: t => t.stages, c: 'var(--pink)' },
-  { id: 'review1', label: '오늘 복습 끝내기', need: 1, get: t => t.reviews, c: 'var(--pink)', when: () => Object.keys(progress.review || {}).length > 0 },
+  { id: 'review1', label: '오늘 쪽지 시험 보기', need: 1, get: t => t.reviews, c: 'var(--pink)', when: () => Object.keys(progress.review || {}).length > 0 },
 ]
 // 날짜로 정해지는 오늘의 미션 3개 (쉬운 것 하나 + 나머지 둘)
 function todayMissions() {
@@ -1115,18 +1146,22 @@ function missionsHTML(t, goal) {
   return `<div class="panel goals"><div class="eyebrow">오늘의 숙제 <span class="num">· ${done} / ${ms.length}</span></div>
     ${ms.map(m => goal(m.label, m.get(t), m.need, m.c)).join('')}${chest}</div>`
 }
+// 쪽지 시험(간격 반복): 틀린 문제가 1일 · 3일 · 7일 뒤에 돌아온다. 자신 있게 틀린 답을 먼저 낸다
 function dueKeys() {
   const rv = progress.review || {}, today = todayStr()
-  return Object.keys(rv).filter(k => !k.startsWith('gb:') && rv[k].due <= today).sort((a, b) => rv[a].due.localeCompare(rv[b].due))
+  return Object.keys(rv).filter(k => !k.startsWith('gb:') && rv[k].due <= today)
+    .sort((a, b) => (rv[b].sure ? 1 : 0) - (rv[a].sure ? 1 : 0) || rv[a].due.localeCompare(rv[b].due))
 }
+function sureCount() { return Object.values(progress.review || {}).filter(r => r.sure).length }
 function reviewCardHTML() {
   const rv = progress.review || {}, all = Object.values(rv), due = dueKeys().length
-  const lv = [0, 1, 2].map(s => all.filter(r => r.step === s).length)
-  return `<div class="panel challenge rvcard"><div class="eyebrow">기억 강도 복습</div>
-    <div class="chbig"><b class="num">${due}</b><span>오늘 복습할 문제</span></div>
+  const lv = [0, 1, 2].map(s => all.filter(r => r.step === s).length), sure = sureCount()
+  const tomorrow = all.filter(r => r.due === todayStr(1)).length
+  return `<div class="panel challenge rvcard${due ? ' due' : ''}"><div class="eyebrow">쪽지 시험${sure ? ` <span class="num">· 잘못 알던 답 ${sure}</span>` : ''}</div>
+    <div class="chbig"><b class="num">${due}</b><span>${due ? '오늘 볼 문제' : tomorrow ? `내일 ${tomorrow}문제가 나와요` : '오늘 볼 문제'}</span></div>
     <div class="memlv"><span class="w">약함 ${lv[0]}</span><span class="m">보통 ${lv[1]}</span><span class="s">강함 ${lv[2]}</span></div>
-    <button class="btn pri" data-act="startReview" ${due ? '' : 'disabled'}>${due ? '복습 시작' : '오늘은 다 했어요'}</button>
-    <p class="chnote">틀린 문제는 1일 · 3일 · 7일 뒤에 다시 나와요</p></div>`
+    <button class="btn pri" data-act="startReview" ${due ? '' : 'disabled'}>${due ? '쪽지 시험 보기' : '오늘은 다 봤어요'}</button>
+    <p class="chnote">틀린 문제는 1일 · 3일 · 7일 뒤에 다시 나와요. 세 번 연속 맞히면 끝나요</p></div>`
 }
 const PASS_LINE = { N5: 80, N4: 90, N3: 95, N2: 90, N1: 100 }
 function mockCardHTML() {
@@ -1360,8 +1395,8 @@ function stageDoneView() {
 
 // ───── 퀴즈 ─────
 function quizHeader() {
-  if (['review', 'mock', 'fix', 'place'].includes(state.quizMode)) {
-    const H = { review: ['mint', '기억 강도', '오늘 복습', '틀렸던 문제 다시'], mock: ['pink', 'JLPT', `${state.mockLevel} 실력 체크`, '문자 · 문법 30문제'],
+  if (['review', 'mock', 'fix', 'place', 'mini'].includes(state.quizMode)) {
+    const H = { review: ['mint', '틀렸던 문제', '쪽지 시험', '1·3·7일 간격'], mini: ['sky', state.miniBack ? '복학 환영' : '짧게 한 번', '2분 수업', '5문제'], mock: ['pink', 'JLPT', `${state.mockLevel} 실력 체크`, '문자 · 문법 30문제'],
       fix: ['sky', '헷갈리는 짝', '오늘의 교정', '빈칸 10문제'], place: ['sun', '월반 시험', '실력 진단', '12문제로 시작 학년 찾기'] }[state.quizMode]
     return `<div class="stagebar" style="--c:var(--${H[0]});--ct:var(--${H[0]}-t)">
       <button class="btn icon-only" data-go="home" aria-label="홈으로">${icon('left')}</button>
@@ -1455,10 +1490,12 @@ function quizView() {
   const last = qz.i === qz.list.length - 1
   // 알림 칸: 맞혔을 때·틀렸을 때 설명 중 긴 쪽 크기로 자리를 미리 잡아 둔다.
   // 그래서 답을 골라도 문제·보기가 움직이지 않고, 설명은 잘리지 않고 다 보인다.
-  const fb = (good, real) => `<div class="feedback ${good ? 'good' : 'bad'}">
+  const sureNote = '망설임 없이 고른 답이 틀렸어요. 이렇게 고친 답이 가장 오래 기억에 남아요 · 내일 쪽지 시험에 나와요'
+  const badNote = real => !real || qz.sureWrong ? sureNote : '내일 쪽지 시험에 다시 나와요'
+  const fb = (good, real) => `<div class="feedback ${good ? 'good' : 'bad'}${!good && real && qz.sureWrong ? ' sure' : ''}">
     <div class="in">
       ${mascot(good ? 'cheer' : 'sad', 'fmascot')}
-      <div class="ftext"><b>${good ? '정답이에요' : '아쉬워요'}${good && qz.justMastered ? '<span class="masterpop">★ 마스터</span>' : ''}</b><span>${good ? (q.right || '') : q.wrong}</span></div>
+      <div class="ftext"><b>${good ? (real && qz.sureFixed ? '잘못 알던 답을 고쳤어요' : '정답이에요') : (real && qz.sureWrong ? '잘못 알고 있었어요' : '아쉬워요')}${good && qz.justMastered ? '<span class="masterpop">★ 마스터</span>' : ''}</b><span>${good ? (q.right || '') : q.wrong}</span>${good ? '' : `<small class="fnote">${badNote(real)}</small>`}</div>
       <button class="btn pri" data-act="nextQ" ${real ? 'id="nextbtn"' : 'tabindex="-1"'}>${last ? '결과 보기' : '계속'}</button>
     </div>
   </div>`
@@ -1478,7 +1515,7 @@ function quizDoneView() {
   const total = qz.list.length
   const perfect = qz.right === total
   const list = qz.missed.length
-    ? `<div class="row">틀린 문제 ${qz.missed.length}개는 다음 퀴즈에 다시 나와요</div>
+    ? `<div class="row">틀린 문제 ${qz.missed.length}개는 내일 쪽지 시험에 다시 나와요</div>
        ${qz.missed.map(q => `<div class="row wrongrow">${q.review}</div>`).join('')}`
     : ''
   return `
@@ -1497,9 +1534,10 @@ function quizDoneView() {
     ${qz.place ? placeResultHTML(qz.place) : ''}
     ${qz.newStamp ? `<div class="talkstampwin"><span class="tstamp big" lang="ja">${qz.newStamp.mark}</span><div><b>${qz.newStamp.name} 도장</b><small>장면 도장 ${Object.keys(progress.talkStamps).length} / ${TALK.length}</small></div></div>` : ''}
     ${state.quizMode === 'talk' && state.talkQuiz !== 'all' && !qz.newStamp && !progress.talkStamps[state.talkQuiz] ? `<p class="locknote">10문제 중 8개 이상 맞히면 장면 도장을 받아요</p>` : ''}
+    ${qz.fixedSure ? `<div class="surefixed"><b class="num">${qz.fixedSure}개</b><span>잘못 알던 답을 이번에 고쳤어요</span></div>` : ''}
     ${rewardsHTML(qz)}
     ${list}
-    <div class="actions"><button class="btn pri" data-act="restartQuiz">다시 풀기</button><button class="btn" data-go="home">처음으로</button></div>
+    <div class="actions"><button class="btn pri" data-act="restartQuiz">${state.quizMode === 'mini' ? '5문제 더' : '다시 풀기'}</button><button class="btn" data-go="home">처음으로</button></div>
   </div>`
 }
 
@@ -1520,8 +1558,16 @@ function pick(i) {
   markStudy()
   // 기억 강도 복습: 틀리면 내일, 맞히면 3일 → 7일 뒤, 세 번 넘기면 끝
   const rv = progress.review || (progress.review = {})
-  if (!ok) rv[q.key] = { step: 0, due: todayStr(1) }
-  else if (rv[q.key] && rv[q.key].due <= todayStr()) { const r = rv[q.key]; r.step++; if (r.step >= 3) delete rv[q.key]; else r.due = todayStr(r.step === 1 ? 3 : 7) }
+  // 잘못 알던 답: 3.5초 안에 망설임 없이 골랐는데 틀리면 '자신 있게 틀린 답'. 이런 실수는 고치면 가장 오래 기억에 남는다
+  const fast = Date.now() - (qz.qStart || 0) < 3500 && !q.order
+  qz.sureWrong = !ok && fast
+  qz.sureFixed = false
+  if (!ok) rv[q.key] = { step: 0, due: todayStr(1), sure: fast || !!(rv[q.key] && rv[q.key].sure) }
+  else if (rv[q.key] && rv[q.key].due <= todayStr()) {
+    const r = rv[q.key]
+    if (r.sure) { r.sure = false; qz.sureFixed = true; qz.fixedSure = (qz.fixedSure || 0) + 1; progress.fixedSure = (progress.fixedSure || 0) + 1 }
+    r.step++; if (r.step >= 3) delete rv[q.key]; else r.due = todayStr(r.step === 1 ? 3 : 7)
+  }
   // 마스터 별: 같은 문법·한자·문장을 3번 연속 맞히면 금별
   const mi = masterItem(q.key), ms = progress.master || (progress.master = {})
   qz.justMastered = false
@@ -1611,7 +1657,7 @@ const ACTIONS = {
   nextVerb() { state.verb++ },
   nextQ() {
     const qz = state.quiz
-    qz.i++; qz.picked = null; qz.comboPop = false; qz.built = []
+    qz.i++; qz.picked = null; qz.comboPop = false; qz.built = []; qz.qStart = Date.now()
     window.scrollTo(0, 0)
     if (qz.i >= qz.list.length && !qz.counted) {
       qz.counted = true
@@ -1658,7 +1704,7 @@ const ACTIONS = {
   quizMode(btn) { state.quizMode = btn.dataset.mode; newQuiz() },
   quizGrade(btn) { state.quizGrade = Number(btn.dataset.grade); newQuiz() },
   restartQuiz() { newQuiz() },
-  mockGo() { state.mockIntro = false; window.scrollTo(0, 0) },
+  mockGo() { state.mockIntro = false; state.quiz.qStart = Date.now(); window.scrollTo(0, 0) },
   startFix() { history.pushState({ v: 'quiz' }, ''); state.quizMode = 'fix'; state.view = 'quiz'; newQuiz(); render(); window.scrollTo(0, 0); return true },
   startPlace() { history.pushState({ v: 'quiz' }, ''); state.quizMode = 'place'; state.view = 'quiz'; newQuiz(); render(); window.scrollTo(0, 0); return true },
   fixPick(btn) {
@@ -1691,6 +1737,7 @@ const ACTIONS = {
     state.catHopTimer = setTimeout(() => { state.catHop = false; if (state.view === 'home') render() }, 1400)
     return true
   },
+  startMini(btn) { state.miniBack = !!(btn && btn.dataset.back); history.pushState({ v: 'quiz' }, ''); state.quizMode = 'mini'; state.view = 'quiz'; newQuiz(); render(); window.scrollTo(0, 0); return true },
   startReview() { history.pushState({ v: 'quiz' }, ''); state.quizMode = 'review'; state.view = 'quiz'; newQuiz(); render(); window.scrollTo(0, 0); return true },
   startMock(btn) { if (!isOpen('grammar', btn.dataset.level)) return true; history.pushState({ v: 'quiz' }, ''); state.mockLevel = btn.dataset.level; state.mockIntro = true; state.quizMode = 'mock'; state.view = 'quiz'; newQuiz(); render(); window.scrollTo(0, 0); return true },
   openChest(btn) {
