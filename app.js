@@ -1148,11 +1148,17 @@ function missionsHTML(t, goal) {
 // 쪽지 시험(간격 반복): 틀린 문제가 1일 · 3일 · 7일 뒤에 돌아온다. 자신 있게 틀린 답을 먼저 낸다
 function dueKeys() {
   const rv = progress.review || {}, today = todayStr()
-  return Object.keys(rv).filter(k => rv[k].due <= today && (!/^g[abcfjo]:/.test(k) || grammarAlive(k)))
+  return Object.keys(rv).filter(k => rv[k].due <= today && keyAlive(k))
     .sort((a, b) => (rv[b].sure ? 1 : 0) - (rv[a].sure ? 1 : 0) || rv[a].due.localeCompare(rv[b].due))
 }
-// 감수에서 빠진 문법 문제는 쪽지 시험에 내지 않는다
-function grammarAlive(k) { const g = grammarById(k.split(':')[1]); return !!g && grammarKeys(g).includes(k) }
+// 감수에서 빠진 문제는 쪽지 시험에 내지 않는다
+function keyAlive(k) {
+  const p = k.split(':')
+  if (/^g[abcfjo]:/.test(k)) { const g = grammarById(p[1]); return !!g && grammarKeys(g).includes(k) }
+  if (/^t[wmb]:/.test(k)) return !!talkQ(p[1], p[2])[p[0]]
+  if (/^o[mwf]:/.test(k)) return !!onoQ(p[1])[p[0]]
+  return true
+}
 function sureCount() { return Object.values(progress.review || {}).filter(r => r.sure).length }
 function reviewCardHTML() {
   const rv = progress.review || {}, all = Object.values(rv), due = dueKeys().length
@@ -1600,6 +1606,9 @@ function pick(i) {
   }
   const next = document.getElementById('nextbtn')
   if (next) next.focus({ preventScroll: true })
+  // 보기가 길어 설명이 화면 밖에 있으면 그때만 설명까지 내려 준다
+  const real = document.querySelector('.fbreal')
+  if (real) { const over = real.getBoundingClientRect().bottom + 12 - innerHeight; if (over > 0) window.scrollBy({ top: over, behavior: 'smooth' }) }
 }
 
 // ───── 이벤트 ─────

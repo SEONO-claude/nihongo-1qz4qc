@@ -32,6 +32,40 @@ function pickKeys(wrongKeys, allKeys) {
 }
 
 // ───── 동사 변화 퀴즈 ─────
+// 오답은 모두 실제로 쓰는 꼴만: 다른 시제·부정, 가능(~할 수 있다), 사역(~하게 하다), 희망(~하고 싶다)
+// 자연 현상·상태처럼 마음대로 할 수 없는 동사는 가능·사역이 어색해서 시제·부정 네 꼴로만 낸다
+const NO_WILL = new Set(('kuru wakaru aru iru naru dekiru hajimaru owaru shiru mieru kikoeru kureru tomaru aku todoku umareru shinu chigau au_2 kawaru ochiru okureru komaru tsukareru hareru furu fuku saku naru_2 '
+  + 'fueru kowareru wareru nareru taoreru moeru hieru nureru tariru kanjiru machigaeru awateru akogareru kimaru tsuzuku heru naoru atsumaru katazuku okoru okoru_2 niau suberu nokoru mayou korobu odoroku nayamu kanashimu yorokobu '
+  + 'shippai chikoku kinchou nyuuin anshin kandou shinpai goukaku sotsugyou seikou keiken yureru tomadou katayoru otoru kotonaru itaru sokonau kuzureru midareru sugureru ochiiru kutsugaeru kagiru yomigaeru aseru heru_2 katamuku tomonau semaru yousuru eikyousuru haneisuru osoreru otozureru oyobosu kenensuru wasureru ushinau otosu makeru hanareru').split(' '))
+const A_ROW = { う: 'わ', く: 'か', ぐ: 'が', す: 'さ', つ: 'た', ぬ: 'な', ぶ: 'ば', む: 'ま', る: 'ら' }
+const E_ROW = { う: 'え', く: 'け', ぐ: 'げ', す: 'せ', つ: 'て', ぬ: 'ね', ぶ: 'べ', む: 'め', る: 'れ' }
+// kind: can 가능 · make 사역 · want 희망
+function verbVariant(word, kind, form) {
+  const pairs = word.ruby.map(p => p.slice()), last = pairs[pairs.length - 1]
+  if (kind === 'want') {
+    const end = { present: 'たいです', past: 'たかったです', negative: 'たくないです', pastNegative: 'たくなかったです' }[form]
+    const out = [...masuStem(word), [end, '']]
+    return { pairs: out, ...pairsToText(out) }
+  }
+  if (word.group === 3) last[0] = last[0].slice(0, -2) + (kind === 'can' ? 'でき' : 'させ')
+  else if (word.group === 2) last[0] = last[0].slice(0, -1) + (kind === 'can' ? 'られ' : 'させ')
+  else { const e = last[0].slice(-1); last[0] = last[0].slice(0, -1) + (kind === 'can' ? E_ROW[e] : A_ROW[e] + 'せ') }
+  const out = [...pairs, [ENDINGS[form], '']]
+  return { pairs: out, ...pairsToText(out) }
+}
+function verbChoices(word, form) {
+  const answer = conjugate(word, form), rest = FORMS.filter(f => f !== form)
+  if (NO_WILL.has(word.id) || (word.group === 3 && !word.reading.endsWith('する'))) return { answer, others: shuffle(rest).slice(0, 3).map(f => conjugate(word, f)), note: '' }
+  const can = verbVariant(word, 'can', form)
+  // 開く의 가능형 開ける처럼 다른 동사와 글자가 같아지면 가능형은 쓰지 않는다
+  const base = can.kanji.slice(0, -ENDINGS[form].length) + 'る'
+  const pick = WORDS.some(w => w.kanji === base) ? ['make', 'want'] : ['can', Math.random() < 0.5 ? 'make' : 'want']
+  // 시제만 다르거나 부정만 다른 꼴 하나
+  const flip = { present: ['past', 'negative'], past: ['present', 'pastNegative'], negative: ['present', 'pastNegative'], pastNegative: ['past', 'negative'] }[form]
+  const vs = pick.map(k => [k, verbVariant(word, k, form)])
+  const KO = { can: '가능(~할 수 있다)', make: '사역(~하게 하다)', want: '희망(~하고 싶다)' }
+  return { answer, others: [conjugate(word, flip[Math.random() < 0.5 ? 0 : 1]), ...vs.map(v => v[1])], note: vs.map(([k, v]) => `${v.kanji}: ${KO[k]}`).join(' · ') }
+}
 function makeVerbQuestion(key) {
   const [id, form] = key.split(':')
   const word = wordById(id)
@@ -39,13 +73,8 @@ function makeVerbQuestion(key) {
   const future = form === 'present' && Math.random() < 0.5
   const prompt = future ? word.fut : word.ko[FORMS.indexOf(form)]
 
-  const answer = conjugate(word, form)
-  const others = shuffle(FORMS.filter(f => f !== form)).slice(0, 2).map(f => conjugate(word, f))
-  const mistake = commonMistake(word, form)
-  const seen = new Set(), choices = []
-  for (const c of [answer, ...others, mistake]) {
-    if (!seen.has(c.kanji)) { seen.add(c.kanji); choices.push({ html: rubyHTML(c.pairs), ok: c === answer }) }
-  }
+  const { answer, others, note } = verbChoices(word, form)
+  const choices = [answer, ...others].map(c => ({ html: rubyHTML(c.pairs), ok: c === answer }))
   const futureTip = future ? '미래(“~할 겁니다”)도 ます형을 그대로 써요' : ''
   return {
     key,
@@ -53,7 +82,7 @@ function makeVerbQuestion(key) {
     prompt: `“${prompt}”는`,
     choices: shuffle(choices),
     right: futureTip,
-    wrong: [ruleText(word, form).replace(/\.$/, ''), futureTip].filter(Boolean).join(' · '),
+    wrong: [ruleText(word, form).replace(/\.$/, ''), note, futureTip].filter(Boolean).join(' · '),
     review: `<span class="jp" lang="ja">${rubyHTML(answer.pairs)}</span><span class="dim">${prompt}</span>`,
   }
 }
@@ -536,10 +565,13 @@ function buildKanjiQuiz(grade, wrongKeys) {
 // ───── 실생활 회화 ─────
 // 문제 키: "tw:konbini:3" 이럴 때 뭐라고 할까 · "tm:konbini:0" 들은 말 뜻 · "tb:konbini:5" 문장 조립
 function talkScene(id) { return (typeof TALK === 'undefined' ? [] : TALK).find(s => s.id === id) }
+function talkQ(sid, i) { return (typeof TALKQ === 'undefined' ? {} : TALKQ)[sid + ':' + i] || {} }
 function talkKeys(sceneId) {
   const scenes = typeof TALK === 'undefined' ? [] : sceneId === 'all' ? TALK : TALK.filter(s => s.id === sceneId)
-  return scenes.flatMap(s => s.lines.flatMap((l, i) => l.who === 'me'
-    ? [`tw:${s.id}:${i}`, `tb:${s.id}:${i}`] : [`tm:${s.id}:${i}`]))
+  return scenes.flatMap(s => s.lines.flatMap((l, i) => {
+    const q = talkQ(s.id, i)
+    return [q.tw && `tw:${s.id}:${i}`, q.tb && `tb:${s.id}:${i}`, q.tm && `tm:${s.id}:${i}`].filter(Boolean)
+  }))
 }
 function makeTalkQuestion(key) {
   const [type, sid, idx] = key.split(':')
@@ -547,31 +579,27 @@ function makeTalkQuestion(key) {
   const tag = ` <span class="gqlv">${s.name}</span>`
   const review = `<span class="jp" lang="ja">${furi(l.jp)}</span><span class="dim">${l.ko}</span>`
   const right = l.note || l.ko, wrong = `${furi(l.jp)} = ${l.ko}${l.note ? ' · ' + l.note : ''}`
-  // 오답 보기는 같은 장면에서 먼저, 모자라면 다른 장면에서
-  const others = (pick, same) => {
-    const pool = [...shuffle(s.lines.filter(x => x !== l && same(x))), ...shuffle(TALK.filter(x => x !== s).flatMap(x => x.lines).filter(same))]
-    const out = [], seen = new Set([pick(l)])
-    for (const x of pool) { if (out.length >= 3) break; if (!seen.has(pick(x))) { seen.add(pick(x)); out.push(pick(x)) } }
-    return out
-  }
+  // 오답은 문장마다 감수한 것(data/talkq.js)만 쓴다
+  const tq = talkQ(sid, idx)
   if (type === 'tw') {
-    const opts = [l.jp, ...others(x => x.jp, x => x.who === 'me')]
+    if (!tq.tw) return null
     return { key, mode: 'talk', review, right, wrong,
       head: `<div class="gq ko">${l.when}</div>`, prompt: `이럴 때 뭐라고 할까요${tag}`,
-      choices: shuffle(opts.map(x => ({ html: furi(x), ok: x === l.jp }))) }
+      choices: shuffle([l.jp, ...tq.tw].map(x => ({ html: furi(x), ok: x === l.jp }))) }
   }
   if (type === 'tm') {
-    const opts = [l.ko, ...others(x => x.ko, () => true)]
+    if (!tq.tm) return null
     return { key, mode: 'talk', review, right: l.when, wrong: `${furi(l.jp)} = ${l.ko}`,
-      head: `<div class="gsent" lang="ja">${furi(l.jp)}</div>`, prompt: `상대가 한 말의 뜻은 <span class="dim">· ${l.when}</span>${tag}`,
-      choices: shuffle(opts.map(x => ({ html: x, ok: x === l.ko, ko: true }))) }
+      head: `<div class="gsent" lang="ja">${furi(l.jp)}</div>`, prompt: `상대가 한 말의 뜻은${tag}`,
+      choices: shuffle([l.ko, ...tq.tm].map(x => ({ html: x, ok: x === l.ko, ko: true }))) }
   }
+  const alt = tq.alt || []
   const parts = l.parts.split(' / ')
   let mix = shuffle(parts.map((_, i) => i))
-  if (mix.every((v, i) => v === i)) mix = [...mix.slice(1), mix[0]]
+  while (gOrderOk(parts, alt, mix)) mix = shuffle(mix)
   return { key, mode: 'talk', review, right, wrong,
     head: `<div class="gq ko">${l.ko}</div>`, prompt: `순서대로 놓아 문장을 완성해요 <span class="dim">· ${l.when}</span>${tag}`,
-    order: { parts: parts.map(furi), mix }, choices: [{ html: '', ok: true }, { html: '', ok: false }] }
+    order: { parts: parts.map(furi), mix, alt, plain: parts }, choices: [{ html: '', ok: true }, { html: '', ok: false }] }
 }
 function buildTalkQuiz(sceneId, wrongKeys) {
   return pickKeys(wrongKeys, talkKeys(sceneId)).map(makeTalkQuestion)
@@ -582,15 +610,17 @@ function buildTalkQuiz(sceneId, wrongKeys) {
 const ONO_CATS = ['감정', '사람 모습', '날씨·자연', '소리', '움직임', '상태·촉감', '맛·식감']
 function onoList() { return typeof ONO === 'undefined' ? [] : ONO }
 function onoById(id) { return onoList().find(o => o.id === id) }
+function onoQ(id) { return (typeof ONOQ === 'undefined' ? {} : ONOQ)[id] || {} }
 function onoKeys(cat) {
-  return onoList().filter(o => cat === 'all' || o.cat === cat).flatMap(o => [`om:${o.id}`, `ow:${o.id}`, `of:${o.id}`])
+  return onoList().filter(o => cat === 'all' || o.cat === cat).flatMap(o => ['om', 'ow', 'of'].filter(t => onoQ(o.id)[t]).map(t => `${t}:${o.id}`))
 }
 function makeOnoQuestion(key) {
   const [type, id] = key.split(':')
   const o = onoById(id)
   const tag = ` <span class="gqlv">${o.cat}</span>`
-  // 오답은 같은 분류에서 먼저 (같은 말이 두 뜻일 때는 빼고)
-  const pool = [...shuffle(onoList().filter(x => x !== o && x.cat === o.cat)), ...shuffle(onoList().filter(x => x.cat !== o.cat))]
+  // 오답은 감수한 헷갈리는 말(data/talkq.js의 ONOQ)에서만
+  if (!onoQ(id)[type]) return null
+  const pool = shuffle((onoQ(id).near || []).map(onoById).filter(Boolean))
   const pick3 = f => { const out = [], seen = new Set([f(o)]); for (const x of pool) { if (out.length >= 3) break; if (x.word === o.word) continue; if (!seen.has(f(x))) { seen.add(f(x)); out.push(f(x)) } } return out }
   const right = `${o.word} = ${o.meaning}${o.ko ? ` (${o.ko})` : ''}`
   const review = `<span class="jp" lang="ja">${o.word}</span><span class="dim">${o.meaning}${o.ko ? ` · ${o.ko}` : ''}</span>`
