@@ -1497,7 +1497,7 @@ function quizView() {
   const last = qz.i === qz.list.length - 1
   // 알림 칸: 맞혔을 때·틀렸을 때 설명 중 긴 쪽 크기로 자리를 미리 잡아 둔다.
   // 그래서 답을 골라도 문제·보기가 움직이지 않고, 설명은 잘리지 않고 다 보인다.
-  const sureNote = '망설임 없이 고른 답이 틀렸어요. 지금 설명을 한 번 더 읽어 두세요 · 내일 쪽지 시험에 나와요'
+  const sureNote = '바로 고른 답이라 더 눈여겨봐요 · 내일 쪽지 시험에 나와요'
   const badNote = real => !real || qz.sureWrong ? sureNote : '내일 쪽지 시험에 다시 나와요'
   const fb = (good, real) => `<div class="feedback ${good ? 'good' : 'bad'}${!good && real && qz.sureWrong ? ' sure' : ''}">
     <div class="in">

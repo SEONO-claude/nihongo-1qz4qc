@@ -63,8 +63,8 @@ function verbChoices(word, form) {
   // 시제만 다르거나 부정만 다른 꼴 하나
   const flip = { present: ['past', 'negative'], past: ['present', 'pastNegative'], negative: ['present', 'pastNegative'], pastNegative: ['past', 'negative'] }[form]
   const vs = pick.map(k => [k, verbVariant(word, k, form)])
-  const KO = { can: '가능(~할 수 있다)', make: '사역(~하게 하다)', want: '희망(~하고 싶다)' }
-  return { answer, others: [conjugate(word, flip[Math.random() < 0.5 ? 0 : 1]), ...vs.map(v => v[1])], note: vs.map(([k, v]) => `${v.kanji}: ${KO[k]}`).join(' · ') }
+  const KO = { can: '~할 수 있다', make: '~하게 하다', want: '~하고 싶다' }
+  return { answer, others: [conjugate(word, flip[Math.random() < 0.5 ? 0 : 1]), ...vs.map(v => v[1])], note: vs.map(([k, v]) => `${v.kanji}: ${KO[k]}의 꼴`).join(' · ') }
 }
 function makeVerbQuestion(key) {
   const [id, form] = key.split(':')
@@ -82,7 +82,7 @@ function makeVerbQuestion(key) {
     prompt: `“${prompt}”는`,
     choices: shuffle(choices),
     right: futureTip,
-    wrong: [ruleText(word, form).replace(/\.$/, ''), note, futureTip].filter(Boolean).join(' · '),
+    wrong: [note || ruleText(word, form).replace(/\.$/, ''), note ? '' : futureTip].filter(Boolean).join(' · '),
     review: `<span class="jp" lang="ja">${rubyHTML(answer.pairs)}</span><span class="dim">${prompt}</span>`,
   }
 }
