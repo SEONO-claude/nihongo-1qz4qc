@@ -276,6 +276,8 @@ function streakInfo() {
   return { n, excused }
 }
 function streak() { return streakInfo().n }
+// 화면에는 줄어드는 '연속'이 아니라 쌓이기만 하는 이번 달 출석 수를 보여 준다
+function monthDays() { const m = todayStr().slice(0, 7); return progress.studyDays.filter(d => d.startsWith(m)).sort() }
 // 마지막으로 공부한 날부터 며칠 지났는지 (오늘 했으면 0)
 function daysAway() {
   if (!progress.studyDays.length || progress.studyDays.includes(todayStr())) return 0
@@ -507,11 +509,11 @@ function bar(label, done, total) {
 function homeView() {
   const date = new Date().toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })
   const weekday = new Date().toLocaleDateString('ko-KR', { weekday: 'long' })
-  const t = todayStats(), s = streak()
+  const t = todayStats(), s = monthDays().length
   const nextSt = STAGES[currentStageIndex()]
   const allClear = STAGES.every(x => stageCleared(x.id))
   const lead = allClear ? `졸업 뒤 목표 · 마스터 별 ★ ${masterCount('g:')} / ${GRAMMAR.length}`
-    : `퀘스트 ${clearedCount()} / ${STAGES.length}칸 통과` + (s >= 2 ? ` · 연속 출석 ${s}일` : '')
+    : `퀘스트 ${clearedCount()} / ${STAGES.length}칸 통과` + (s >= 2 ? ` · 이번 달 ${s}일 출석` : '')
 
   // 다음 목표: 지금 스테이지를 통과하면 무엇이 열리는지
   const after = STAGES[currentStageIndex() + 1]
@@ -531,7 +533,7 @@ function homeView() {
     <span>${label}${n >= max ? check : ''}</span><span class="num">${Math.min(n, max)} / ${max}</span>
     <div class="bar"><i style="width:${Math.min(n, max) / max * 100}%"></i></div></div>`
   const away = daysAway(), dueN = dueKeys().length
-  const hello = away >= 3 ? '다시 와 줘서 반가워요' : t.solved > 0 ? `오늘 ${t.solved}문제 풀었어요` : s >= 2 ? `연속 출석 ${s}일째예요` : '같이 공부해요'
+  const hello = away >= 3 ? '다시 와 줘서 반가워요' : t.solved > 0 ? `오늘 ${t.solved}문제 풀었어요` : s >= 2 ? `이번 달 ${s}일 출석했어요` : '같이 공부해요'
   const main = allClear ? '<button class="btn pri" data-act="startFix">오늘의 교정 10문제</button>' : '<button class="btn pri" data-act="questContinue">퀘스트 계속</button>'
   const second = !progress.placed && clearedCount() < 3 ? '<button class="btn" data-act="startPlace">실력 진단</button>'
     : '<button class="btn" data-act="startMini">2분 수업</button>'
@@ -550,7 +552,7 @@ function homeView() {
     </div>
   </section>
   ${away >= 3 ? `<div class="panel backcard"><div class="eyebrow">복학 환영</div>
-    <b>${away}일 만이에요</b><p>쉬었다 와도 괜찮아요. 앞 학기 문제로 5문제만 가볍게 풀어 봐요</p>
+    <b>다시 만나서 반가워요</b><p>앞 학기 문제로 5문제만 가볍게 풀어 봐요</p>
     <button class="btn pri" data-act="startMini" data-back="1">다시 시작 · 5문제</button></div>` : ''}
   ${dueN ? reviewCardHTML() : ''}
   ${correctionCardHTML()}
@@ -569,24 +571,24 @@ function homeView() {
 
 // ───── 내 정보 · 설정 ─────
 function meView() {
-  const s = streak()
+  const attended = monthDays(), s = attended.length
   const allK = progress.seenKanji.filter(c => KANJI[c]).length
   const kanjiQ = Object.values(KANJI).reduce((n, k) => n + 1 + k.examples.length, 0) + highKanjiKeys(Object.keys(HK_SETS)).length
   const wrong = progress.wrong.length + progress.wrongKanji.length + progress.wrongGrammar.length
-  const days = new Set(progress.studyDays), excused = new Set(streakInfo().excused)
-  const cells = Array.from({ length: 14 }, (_, n) => {
-    const day = todayStr(n - 13), d = new Date(day)
-    return `<span class="stampcell${n === 13 ? ' today' : ''}" title="${day}"><span class="stampday num">${d.getDate()}</span>${days.has(day) ? `<span class="stamp" lang="ja" style="--r:${((d.getDate() * 37) % 21) - 10}deg">済</span>` : excused.has(day) ? '<span class="stamp excuse" aria-label="결석계">결</span>' : ''}</span>`
+  // 출석한 날만 차례로 찍는다 (빠진 날을 빈칸으로 보여 주지 않는다)
+  const cells = attended.map(day => {
+    const d = Number(day.slice(8))
+    return `<span class="stampcell${day === todayStr() ? ' today' : ''}" title="${day}"><span class="stampday num">${d}</span><span class="stamp" lang="ja" style="--r:${((d * 37) % 21) - 10}deg">済</span></span>`
   }).join('')
   const b = buddy()
   return `
   <div class="mehead">
     <img src="${catImage(b)}" alt="${b.name}" width="400" height="400">
     <div><span class="lvchip">${rankName()}</span><h1>내 정보</h1>
-      <p>성적 수 <b class="num">${gradeCount(3)}</b>칸 · 연속 출석 <b class="num">${s}</b>일 · 단짝 ${b.name}</p></div>
+      <p>성적 수 <b class="num">${gradeCount(3)}</b>칸 · 이번 달 출석 <b class="num">${s}</b>일 · 단짝 ${b.name}</p></div>
   </div>
-  <div class="panel stampcard"><div class="eyebrow">출석부 <span class="num">· 최근 14일</span></div><div class="stampgrid">${cells}</div>
-    <div class="hint">카드를 보거나 문제를 풀면 그날 출석 도장이 찍혀요 · 일주일에 하루는 쉬어도 결석계로 연속 출석이 이어져요</div></div>
+  <div class="panel stampcard"><div class="eyebrow">출석부 <span class="num">· 이번 달 ${s}일</span></div>${cells ? `<div class="stampgrid">${cells}</div>` : ''}
+    <div class="hint">카드를 보거나 문제를 풀면 그날 출석 도장이 찍혀요</div></div>
   <div class="panel">
     <div class="hd">전체 기록</div>
     ${bar('마스터한 문법 ★', masterCount('g:'), GRAMMAR.length)}
@@ -1145,7 +1147,7 @@ function missionsHTML(t, goal) {
   return `<div class="panel goals"><div class="eyebrow">오늘의 숙제 <span class="num">· ${done} / ${ms.length}</span></div>
     ${ms.map(m => goal(m.label, m.get(t), m.need, m.c)).join('')}${chest}</div>`
 }
-// 쪽지 시험(간격 반복): 틀린 문제가 1일 · 3일 · 7일 뒤에 돌아온다. 자신 있게 틀린 답을 먼저 낸다
+// 쪽지 시험(간격 반복): 틀린 문제가 1일 · 3일 · 7일 · 30일 뒤에 돌아온다. 자신 있게 틀린 답을 먼저 낸다
 function dueKeys() {
   const rv = progress.review || {}, today = todayStr()
   return Object.keys(rv).filter(k => rv[k].due <= today && keyAlive(k))
@@ -1159,16 +1161,17 @@ function keyAlive(k) {
   if (/^o[mwf]:/.test(k)) return !!onoQ(p[1])[p[0]]
   return true
 }
+const REVIEW_GAPS = [1, 3, 7, 30]   // 틀린 뒤 1일, 그다음 맞힐 때마다 3일 · 7일 · 30일
 function sureCount() { return Object.values(progress.review || {}).filter(r => r.sure).length }
 function reviewCardHTML() {
   const rv = progress.review || {}, all = Object.values(rv), due = dueKeys().length
-  const lv = [0, 1, 2].map(s => all.filter(r => r.step === s).length), sure = sureCount()
+  const lv = [all.filter(r => r.step === 0).length, all.filter(r => r.step === 1).length, all.filter(r => r.step >= 2).length], sure = sureCount()
   const tomorrow = all.filter(r => r.due === todayStr(1)).length
   return `<div class="panel challenge rvcard${due ? ' due' : ''}"><div class="eyebrow">쪽지 시험${sure ? ` <span class="num">· 잘못 알던 답 ${sure}</span>` : ''}</div>
     <div class="chbig"><b class="num">${due}</b><span>${due ? '오늘 볼 문제' : tomorrow ? `내일 ${tomorrow}문제가 나와요` : '오늘 볼 문제'}</span></div>
     <div class="memlv"><span class="w">약함 ${lv[0]}</span><span class="m">보통 ${lv[1]}</span><span class="s">강함 ${lv[2]}</span></div>
     <button class="btn pri" data-act="startReview" ${due ? '' : 'disabled'}>${due ? '쪽지 시험 보기' : '오늘은 다 봤어요'}</button>
-    <p class="chnote">틀린 문제는 1일 · 3일 · 7일 뒤에 다시 나와요. 세 번 연속 맞히면 끝나요</p></div>`
+    <p class="chnote">틀린 문제는 1일 · 3일 · 7일 · 30일 뒤에 다시 나와요. 네 번 연속 맞히면 끝나요</p></div>`
 }
 const PASS_LINE = { N5: 80, N4: 90, N3: 95, N2: 90, N1: 100 }
 function mockCardHTML() {
@@ -1389,6 +1392,7 @@ function stageDoneView() {
         <div class="stat"><b class="num">${qz.best}</b><small>최고 연속</small></div>
       </div>
     </div>
+    ${againHTML(qz)}
     ${qz.levelUp ? `<div class="levelup"><span class="lvbig">진급</span><span>${rankName()}</span></div>` : ''}
     ${diploma}
     ${qz.graduated && sc.id !== 'high' ? `<div class="newcat grow"><div class="eyebrow">${sc.id === 'elem' ? '중학생이 됐어요' : '고등학생이 됐어요'}</div>
@@ -1403,7 +1407,7 @@ function stageDoneView() {
 // ───── 퀴즈 ─────
 function quizHeader() {
   if (['review', 'mock', 'fix', 'place', 'mini'].includes(state.quizMode)) {
-    const H = { review: ['mint', '틀렸던 문제', '쪽지 시험', '1·3·7일 간격'], mini: ['sky', state.miniBack ? '복학 환영' : '짧게 한 번', '2분 수업', '5문제'], mock: ['pink', 'JLPT', `${state.mockLevel} 실력 체크`, '문자 · 문법 30문제'],
+    const H = { review: ['mint', '틀렸던 문제', '쪽지 시험', '1·3·7·30일'], mini: ['sky', state.miniBack ? '복학 환영' : '짧게 한 번', '2분 수업', '5문제'], mock: ['pink', 'JLPT', `${state.mockLevel} 실력 체크`, '문자 · 문법 30문제'],
       fix: ['sky', '헷갈리는 짝', '오늘의 교정', '빈칸 10문제'], place: ['sun', '월반 시험', '실력 진단', '12문제로 시작 학년 찾기'] }[state.quizMode]
     return `<div class="stagebar" style="--c:var(--${H[0]});--ct:var(--${H[0]}-t)">
       <button class="btn icon-only" data-go="home" aria-label="홈으로">${icon('left')}</button>
@@ -1447,7 +1451,7 @@ function quizTop(qz) {
   const answered = qz.picked !== null && qz.i < qz.list.length
   const pct = Math.min(100, (qz.i + (answered ? 1 : 0)) / qz.list.length * 100)
   return `<div class="qtop"><div class="qbar" role="progressbar" aria-valuenow="${Math.round(pct)}" aria-valuemin="0" aria-valuemax="100"><i style="width:${pct}%"></i></div>
-    <span class="combo${qz.comboPop ? ' pop' : ''}">${qz.combo >= 2 ? `${qz.combo}연속 정답` : `${Math.min(qz.i + 1, qz.list.length)} / ${qz.list.length}`}</span></div>`
+    <span class="combo${qz.comboPop ? ' pop' : ''}">${qz.again ? `다시 풀기 ${Math.min(qz.i + 1, qz.list.length)} / ${qz.list.length}` : qz.combo >= 2 ? `${qz.combo}연속 정답` : `${Math.min(qz.i + 1, qz.list.length)} / ${qz.list.length}`}</span></div>`
 }
 
 function quizView() {
@@ -1456,7 +1460,7 @@ function quizView() {
     <div class="gempty">${mascot('think')}<p><b>${state.mockLevel} 실력 체크</b><br>문자 10 · 문법 15 · 표현 5, 모두 30문제 · 10분쯤 걸려요</p>
     <ul><li>JLPT의 <b>문자·문법</b> 부분만 점검해요. 독해·청해는 들어 있지 않아요</li><li>문제마다 바로 정답을 알려 줘요</li><li>중간에 나가면 이번 점수는 남지 않아요</li></ul>
     <button class="btn pri" data-act="mockGo">시작하기</button></div></div>`
-  if (!qz.list.length && state.quizMode === 'review') return quizHeader() + `<div class="panel"><div class="gempty">${mascot('cheer')}<p>오늘 복습할 문제가 없어요<br>틀린 문제는 1일 · 3일 · 7일 뒤에 다시 나와요</p><button class="btn pri" data-go="home">홈으로</button></div></div>`
+  if (!qz.list.length && state.quizMode === 'review') return quizHeader() + `<div class="panel"><div class="gempty">${mascot('cheer')}<p>오늘 복습할 문제가 없어요<br>틀린 문제는 1일 · 3일 · 7일 · 30일 뒤에 다시 나와요</p><button class="btn pri" data-go="home">홈으로</button></div></div>`
   if (!qz.list.length) return quizHeader() + `
   <div class="panel"><div class="gempty">${mascot('think')}<p>저장한 문법이 아직 없어요.<br><b>문법</b> 메뉴에서 헷갈리는 문법에 <b>☆ 저장</b>을 눌러 보세요</p>
     <button class="btn pri" data-go="grammar">문법 보러 가기</button></div></div>`
@@ -1495,15 +1499,19 @@ function quizView() {
   const promptMain = hintM ? q.prompt.replace(hintM[0], '').replace(/\s+(?=<span class="gqlv">)/, ' ') : q.prompt
   const say = !answered ? promptMain : qz.say
   const last = qz.i === qz.list.length - 1
+  const willAgain = !qz.again && !NO_AGAIN.includes(state.quizMode) && (qz.missed.length > 0)
   // 알림 칸: 맞혔을 때·틀렸을 때 설명 중 긴 쪽 크기로 자리를 미리 잡아 둔다.
   // 그래서 답을 골라도 문제·보기가 움직이지 않고, 설명은 잘리지 않고 다 보인다.
-  const sureNote = '바로 고른 답이라 더 눈여겨봐요 · 내일 쪽지 시험에 나와요'
-  const badNote = real => !real || qz.sureWrong ? sureNote : '내일 쪽지 시험에 다시 나와요'
+  // 맞혔지만 자신 없었을 때: 누르면 내일 쪽지 시험에 나온다 (다시 누르면 취소)
+  const canUnsure = !qz.again && !NO_AGAIN.includes(state.quizMode)
+  const unsureHTML = real => !canUnsure ? '' : `<button class="unsure${real && qz.unsure ? ' on' : ''}" data-act="unsure" ${real ? `aria-pressed="${!!qz.unsure}"` : 'tabindex="-1"'}>${real && qz.unsure ? '내일 쪽지 시험에 넣었어요' : '긴가민가했어요'}</button>`
+  const sureNote = '바로 고른 답이라 더 눈여겨봐요 · 이따 한 번 더 나와요'
+  const badNote = real => qz.again ? '내일 쪽지 시험에서 또 만나요' : NO_AGAIN.includes(state.quizMode) ? '내일 쪽지 시험에 다시 나와요' : !real || qz.sureWrong ? sureNote : '이따 한 번 더, 내일 쪽지 시험에도 나와요'
   const fb = (good, real) => `<div class="feedback ${good ? 'good' : 'bad'}${!good && real && qz.sureWrong ? ' sure' : ''}">
     <div class="in">
       ${mascot(good ? 'cheer' : 'sad', 'fmascot')}
-      <div class="ftext"><b>${good ? (real && qz.sureFixed ? '잘못 알던 답을 고쳤어요' : '정답이에요') : (real && qz.sureWrong ? '잘못 알고 있었어요' : '아쉬워요')}${good && qz.justMastered ? '<span class="masterpop">★ 마스터</span>' : ''}</b><span>${good ? (q.right || '') : q.wrong}</span>${good ? '' : `<small class="fnote">${badNote(real)}</small>`}</div>
-      <button class="btn pri" data-act="nextQ" ${real ? 'id="nextbtn"' : 'tabindex="-1"'}>${last ? '결과 보기' : '계속'}</button>
+      <div class="ftext"><b>${good ? (real && qz.sureFixed ? '잘못 알던 답을 고쳤어요' : '정답이에요') : (real && qz.sureWrong ? '잘못 알고 있었어요' : '아쉬워요')}${good && qz.justMastered ? '<span class="masterpop">★ 마스터</span>' : ''}</b><span>${good ? (q.right || '') : q.wrong}</span>${good ? unsureHTML(real) : `<small class="fnote">${badNote(real)}</small>`}</div>
+      <button class="btn pri" data-act="nextQ" ${real ? 'id="nextbtn"' : 'tabindex="-1"'}>${last && !willAgain ? '결과 보기' : '계속'}</button>
     </div>
   </div>`
   // 두 설명을 같은 칸에 겹쳐 두면, 칸 높이는 둘 중 더 큰 쪽이 된다
@@ -1541,6 +1549,7 @@ function quizDoneView() {
     ${qz.mock ? mockResultHTML(qz.mock) : ''}
     ${qz.newStamp ? `<div class="talkstampwin"><span class="tstamp big" lang="ja">${qz.newStamp.mark}</span><div><b>${qz.newStamp.name} 도장</b><small>장면 도장 ${Object.keys(progress.talkStamps).length} / ${TALK.length}</small></div></div>` : ''}
     ${state.quizMode === 'talk' && state.talkQuiz !== 'all' && !qz.newStamp && !progress.talkStamps[state.talkQuiz] ? `<p class="locknote">10문제 중 8개 이상 맞히면 장면 도장을 받아요</p>` : ''}
+    ${againHTML(qz)}
     ${qz.fixedSure ? `<div class="surefixed"><b class="num">${qz.fixedSure}개</b><span>잘못 알던 답을 이번에 고쳤어요</span></div>` : ''}
     ${rewardsHTML(qz)}
     ${list}
@@ -1548,10 +1557,72 @@ function quizDoneView() {
   </div>`
 }
 
+// ───── 다시 풀기: 틀린 문제를 그 수업 안에서 한 번 더 ─────
+// 정답을 한 번 보는 것만으로는 금방 되돌아간다. 설명을 본 뒤 스스로 다시 맞혀 보게 한다.
+// 점수·성적·쪽지 시험 날짜·마스터에는 영향을 주지 않는다. 실력 진단과 모의고사에는 없다
+const NO_AGAIN = ['place', 'mock']
+function startAgain(qz) {
+  if (NO_AGAIN.includes(state.quizMode) || !qz.missed.length) return false
+  const list = shuffle(qz.missed.map(q => questionFromKey(q.key) || q))
+  qz.main = qz.list
+  qz.list = list; qz.i = 0; qz.picked = null; qz.built = []; qz.combo = 0
+  qz.again = true; qz.againRight = 0
+  return true
+}
+function nextAgain(qz) {
+  qz.i++; qz.picked = null; qz.built = []
+  window.scrollTo(0, 0)
+  if (qz.i < qz.list.length) return
+  qz.again = false
+  qz.againTotal = qz.list.length
+  qz.list = qz.main; qz.i = qz.list.length
+  showQuizDone(qz)
+  return true
+}
+function showQuizDone(qz) {
+  render()
+  SFX.done()
+  confetti(innerWidth / 2, innerHeight * 0.35, qz.right === qz.list.length ? 70 : 36)
+  window.scrollTo({ top: 0, behavior: 'smooth' })
+}
+function pickAgain(qz, q, i, x, y) {
+  const ok = q.choices[i].ok
+  qz.sureWrong = qz.sureFixed = qz.justMastered = false
+  if (ok) qz.againRight++
+  qz.say = ok ? '이번에는 맞혔어요' : pickOne(ENCOURAGE)
+  render()
+  if (ok) { SFX.good(); confetti(x, y, 24) } else SFX.bad()
+  showFeedback()
+}
+function againHTML(qz) {
+  if (!qz.againTotal) return ''
+  return `<div class="surefixed"><b class="num">${qz.againRight} / ${qz.againTotal}</b><span>${qz.againRight ? '틀린 문제를 바로 다시 맞혔어요' : '다시 푼 문제예요. 내일 또 만나요'}</span></div>`
+}
+// 설명이 화면 밖에 있으면(보기가 긴 문제) 그때만 설명까지 내려 준다
+function showFeedback() {
+  const next = document.getElementById('nextbtn')
+  if (next) next.focus({ preventScroll: true })
+  const real = document.querySelector('.fbreal')
+  if (real) { const over = real.getBoundingClientRect().bottom + 12 - innerHeight; if (over > 0) window.scrollBy({ top: over, behavior: 'smooth' }) }
+}
+// 평소 속도: 문제 종류(한자 읽기, 빈칸…)마다 최근 30번의 시간을 기억해, 그 가운데 값보다 빠르면 망설임 없이 고른 것으로 본다
+function kindOf(key) { const p = String(key).split(':')[0]; return /^(r|m|hk|nm|nw|g[acfj]|t[wm]|o[mwf])$/.test(p) ? p : 'v' }
+function isFast(key, ms) {
+  const all = progress.paces || (progress.paces = {}), k = kindOf(key), a = all[k] || []
+  const mid = a.length >= 8 ? a.slice().sort((x, y) => x - y)[Math.floor(a.length / 2)] : 0
+  if (ms < 60000) all[k] = [...a, Math.round(ms)].slice(-30)   // 오래 자리를 비운 것은 세지 않는다
+  return ms < mid
+}
+
 function recentKeys() { return new Set(progress.recentQ || []) }
 function pick(i) {
   const qz = state.quiz
   if (qz.picked !== null) return
+  if (qz.again) {
+    const b = document.querySelector(`[data-pick="${i}"]`), [bx, by] = b ? centerOf(b) : [innerWidth / 2, innerHeight / 2]
+    qz.picked = i
+    return pickAgain(qz, qz.list[qz.i], i, bx, by)
+  }
   todayStats().solved++
   { const k = qz.list[qz.i].key; if (k) { const r = (progress.recentQ || []).filter(x => x !== k); r.push(k); progress.recentQ = r.slice(-400) } }
   const btn = document.querySelector(`[data-pick="${i}"]`)
@@ -1563,17 +1634,19 @@ function pick(i) {
   const wrong = m === 'kanji' ? 'wrongKanji' : m === 'grammar' ? 'wrongGrammar' : m === 'talk' ? 'wrongTalk' : m === 'ono' ? 'wrongOno' : 'wrong'
   const ok = q.choices[i].ok
   markStudy()
-  // 기억 강도 복습: 틀리면 내일, 맞히면 3일 → 7일 뒤, 세 번 넘기면 끝
+  // 쪽지 시험: 틀리면 내일, 맞히면 3일 → 7일 → 30일 뒤, 네 번 맞히면 끝
   const rv = progress.review || (progress.review = {})
-  // 잘못 알던 답: 3.5초 안에 망설임 없이 골랐는데 틀리면 '자신 있게 틀린 답'. 쪽지 시험에서 먼저 다시 낸다
-  const fast = Date.now() - (qz.qStart || 0) < 3500 && !q.order
+  const fast = !q.order && isFast(q.key, Date.now() - (qz.qStart || Date.now()))
   qz.sureWrong = !ok && fast
   qz.sureFixed = false
-  if (!ok) rv[q.key] = { step: 0, due: todayStr(1), sure: fast || !!(rv[q.key] && rv[q.key].sure) }
-  else if (rv[q.key] && rv[q.key].due <= todayStr()) {
-    const r = rv[q.key]
-    if (r.sure) { r.sure = false; qz.sureFixed = true; qz.fixedSure = (qz.fixedSure || 0) + 1; progress.fixedSure = (progress.fixedSure || 0) + 1 }
-    r.step++; if (r.step >= 3) delete rv[q.key]; else r.due = todayStr(r.step === 1 ? 3 : 7)
+  const old = rv[q.key]
+  qz.unsure = false; qz.undo = null
+  if (!ok) rv[q.key] = { step: 0, due: todayStr(1), sure: fast || !!(old && old.sure) }
+  else if (old && old.due <= todayStr()) {
+    // 잘못 알던 답은 한 번 맞혀도 표시를 지우지 않고 네 번을 다 맞힐 때까지 지켜본다
+    if (old.sure && !old.fixed) { qz.sureFixed = true; qz.fixedSure = (qz.fixedSure || 0) + 1; progress.fixedSure = (progress.fixedSure || 0) + 1 }
+    const r = { ...old, step: old.step + 1, fixed: !!old.sure }
+    if (r.step >= REVIEW_GAPS.length) delete rv[q.key]; else rv[q.key] = { ...r, due: todayStr(REVIEW_GAPS[r.step]) }
   }
   // 마스터 별: 같은 문법·한자·문장을 3번 연속 맞히면 금별
   const mi = masterItem(q.key), ms = progress.master || (progress.master = {})
@@ -1604,11 +1677,7 @@ function pick(i) {
   } else {
     SFX.bad()
   }
-  const next = document.getElementById('nextbtn')
-  if (next) next.focus({ preventScroll: true })
-  // 보기가 길어 설명이 화면 밖에 있으면 그때만 설명까지 내려 준다
-  const real = document.querySelector('.fbreal')
-  if (real) { const over = real.getBoundingClientRect().bottom + 12 - innerHeight; if (over > 0) window.scrollBy({ top: over, behavior: 'smooth' }) }
+  showFeedback()
 }
 
 // ───── 이벤트 ─────
@@ -1667,6 +1736,7 @@ const ACTIONS = {
   nextVerb() { state.verb++ },
   nextQ() {
     const qz = state.quiz
+    if (qz.again) return nextAgain(qz)
     qz.i++; qz.picked = null; qz.comboPop = false; qz.built = []; qz.qStart = Date.now()
     window.scrollTo(0, 0)
     if (qz.i >= qz.list.length && !qz.counted) {
@@ -1700,11 +1770,10 @@ const ACTIONS = {
       bumpToday('quizzes')
       qz.newBadges = checkBadges()
       saveProgress()
-      render()
       addXP(20 + bonus)
-      SFX.done()
-      confetti(innerWidth / 2, innerHeight * 0.35, qz.right === qz.list.length ? 70 : 36)
-      window.scrollTo({ top: 0, behavior: 'smooth' })
+      // 성적은 여기서 이미 정해지고 저장됐다. 틀린 문제는 결과를 보기 전에 한 번 더 (중간에 나가도 성적은 남는다)
+      if (startAgain(qz)) { render(); return true }
+      showQuizDone(qz)
       return true
     }
   },
@@ -1714,6 +1783,15 @@ const ACTIONS = {
   quizMode(btn) { state.quizMode = btn.dataset.mode; newQuiz() },
   quizGrade(btn) { state.quizGrade = Number(btn.dataset.grade); newQuiz() },
   restartQuiz() { newQuiz() },
+  unsure() {
+    const qz = state.quiz, q = qz && qz.list[qz.i]
+    if (!q || qz.picked === null || qz.again) return true
+    const rv = progress.review || (progress.review = {})
+    if (qz.unsure) { if (qz.undo) rv[q.key] = qz.undo; else delete rv[q.key]; qz.undo = null }
+    else { qz.undo = rv[q.key] ? { ...rv[q.key] } : null; rv[q.key] = { ...(rv[q.key] || {}), step: 0, due: todayStr(1) } }
+    qz.unsure = !qz.unsure
+    saveProgress(); SFX.tap()
+  },
   mockGo() { state.mockIntro = false; state.quiz.qStart = Date.now(); window.scrollTo(0, 0) },
   startFix() { history.pushState({ v: 'quiz' }, ''); state.quizMode = 'fix'; state.view = 'quiz'; newQuiz(); render(); window.scrollTo(0, 0); return true },
   startPlace() { history.pushState({ v: 'quiz' }, ''); state.quizMode = 'place'; state.view = 'quiz'; newQuiz(); render(); window.scrollTo(0, 0); return true },
@@ -1938,7 +2016,7 @@ function showOpening() {
   try { if (sessionStorage.getItem('opened')) return } catch { /* 저장 못 하면 매번 보여 준다 */ }
   if (progress.openedOn === todayStr()) return   // 하루 첫 실행에만 오프닝
   const reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches
-  const s = streak()
+  const s = monthDays().length
   const title = '미묘한 일본어'
   const el = document.createElement('div')
   el.id = 'opening'
@@ -1955,7 +2033,7 @@ function showOpening() {
     </div>
     <h1 class="op-title">${[...title].map((c, i) => c === ' ' ? '<span class="sp"> </span>' : `<span style="--i:${i}">${c}</span>`).join('')}</h1>
     <p class="op-tag">뜻은 알죠. 읽는 법만 고쳐요</p>
-    <p class="op-sub"><span class="lvchip">${rankName()}</span>${s >= 2 ? `<span class="op-streak">연속 출석 ${s}일</span>` : ''}</p>
+    <p class="op-sub"><span class="lvchip">${rankName()}</span>${s >= 2 ? `<span class="op-streak">이번 달 ${s}일 출석</span>` : ''}</p>
     <div class="op-btns"><button class="btn pri op-start" data-snd="on">소리 켜고 시작</button><button class="btn op-quiet" data-snd="off">조용히 시작</button></div>`
   document.body.appendChild(el)
   document.documentElement.classList.add('opening')

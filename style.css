@@ -1050,3 +1050,11 @@ span.gmark.g2 { color: var(--sun-ink); border-color: var(--sun-ink); }
 .done p { text-align: center; }
 .hero-text .lvchip { align-self: flex-start; justify-self: start; width: fit-content; }
 .tabs.cardtabs button .num { font-size: 12px; }
+
+/* 긴가민가 버튼: 정답 설명 안의 작은 버튼 (누르는 넓이는 44px) */
+.unsure { display: inline-flex; align-items: center; min-height: 44px; margin: 2px 0 -8px; padding: 0; border: 0; background: none; color: inherit; font: inherit; font-size: 14px; text-decoration: underline; text-underline-offset: 4px; cursor: pointer; }
+.unsure.on { text-decoration: none; font-weight: 600; }
+/* 설명 칸의 글을 조금 촘촘하게: 설명이 길어도 화면 안에 들어오게 */
+.fbslot .feedback { padding-top: 8px; padding-bottom: 8px; }
+.fbslot .ftext { line-height: 1.45; }
+.fbslot .unsure { margin: -4px 0 -10px; }

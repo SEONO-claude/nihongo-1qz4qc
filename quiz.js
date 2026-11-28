@@ -625,10 +625,10 @@ function makeOnoQuestion(key) {
   const right = `${o.word} = ${o.meaning}${o.ko ? ` (${o.ko})` : ''}`
   const review = `<span class="jp" lang="ja">${o.word}</span><span class="dim">${o.meaning}${o.ko ? ` · ${o.ko}` : ''}</span>`
   const ex = `${furi(o.example.jp.replace(/［|］/g, ''))} · ${o.example.ko}`
-  if (type === 'om') return { key, mode: 'ono', review, right: ex, wrong: `${right} · 예: ${ex}`,
+  if (type === 'om') return { key, mode: 'ono', review, right: ex, wrong: ex,
     head: `<div class="gq onoq" lang="ja">${o.word}</div>`, prompt: `무슨 뜻일까요${tag}`,
     choices: shuffle([o.meaning, ...pick3(x => x.meaning)].map(x => ({ html: x, ok: x === o.meaning, ko: true }))) }
-  if (type === 'ow') return { key, mode: 'ono', review, right, wrong: `${right} · 예: ${ex}`,
+  if (type === 'ow') return { key, mode: 'ono', review, right, wrong: right,
     head: `<div class="gq ko">${o.when}</div>`, prompt: `이럴 때 쓰는 말은${tag}`,
     choices: shuffle([o.word, ...pick3(x => x.word)].map(x => ({ html: x, ok: x === o.word }))) }
   return { key, mode: 'ono', review, right, wrong: right,
