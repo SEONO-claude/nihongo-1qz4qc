@@ -128,18 +128,29 @@ function highList(g) { return typeof HIGH_KANJI === 'undefined' ? [] : HIGH_KANJ
 const HK_SETS = { jukuji: '특수 읽기', yoji: '사자숙어', nandoku: '틀리기 쉬운 읽기' }
 function highKanjiKeys(sets) {
   if (typeof HIGH_KANJI === 'undefined') return []
-  return sets.flatMap(s => (HIGH_KANJI[s] || []).flatMap((_, i) => [`hk:${s}:${i}:r`, `hk:${s}:${i}:m`]))
+  return sets.flatMap(s => (HIGH_KANJI[s] || []).flatMap((e, i) => hkWordOk(s, i) ? [`hk:${s}:${i}:r`, `hk:${s}:${i}:m`] : [`hk:${s}:${i}:r`]))
+}
+function hkLists(s, w) { return [HIGH_KANJI[s], Object.values(HIGH_KANJI).flat(), shapeList(w)] }
+const HK_OK = {}
+function hkWordOk(s, i) {
+  const k = s + ':' + i, e = HIGH_KANJI[s][Number(i)]
+  if (!(k in HK_OK)) HK_OK[k] = [...e[0]].length > 1 && hasMisses(e[0], e[1], hkLists(s, e[0]).flat().filter(x => wordShape(x[0]) === wordShape(e[0])))
+  return HK_OK[k]
 }
 function makeHighKanjiQuestion(key) {
-  const [, s, i, type] = key.split(':')
+  let [, s, i, type] = key.split(':')
+  if (type === 'm' && !hkWordOk(s, i)) type = 'r'
   const list = HIGH_KANJI[s]
   const [w, r, m] = list[Number(i)]
   const tag = ` <span class="gqlv">${HK_SETS[s]}</span>`
   const review = `<span class="jp" lang="ja"><ruby>${w}<rt>${r}</rt></ruby></span><span class="dim">${m}</span>`
   const right = `${w}(${r}) = ${m}`
   if (type === 'r') {
-    const others = shuffle(list.map(e => e[1]).filter(x => x !== r && Math.abs(x.length - r.length) <= 2))
-    const misses = shuffle(nearMisses(r))
+    const tail = kanaTail(w), fair = x => x !== r && x.endsWith(tail) && !readsOf(w).has(x)
+    const reads = (a, d) => shuffle(a.map(e => e[1]).filter(x => fair(x) && Math.abs(x.length - r.length) <= d))
+    let others = [...reads(list, 2), ...reads(Object.values(HIGH_KANJI).flat(), 3)]
+    if (new Set(others).size < 3) others = [...others, ...reads(Object.keys(KANJI).flatMap(x => KANJI[x].examples), 3), ...stemMisses(w, r, fair)]
+    const misses = shuffle(nearMisses(r).filter(fair))
     const picks = new Set([r])
     if (misses[0]) picks.add(misses[0])
     for (const x of others) { if (picks.size >= 4) break; picks.add(x) }
@@ -149,7 +160,7 @@ function makeHighKanjiQuestion(key) {
       choices: shuffle([...picks].map(x => ({ html: x, ok: x === r }))) }
   }
   // 읽기를 보여 주고 그렇게 읽는 낱말 고르기 (한국어 뜻 고르기는 쓰지 않는다)
-  const others = shuffle([...new Set(list.filter(e => e[1] !== r && e[0] !== w && Math.abs(e[0].length - w.length) <= 1).map(e => e[0]))]).slice(0, 3)
+  const others = wordMisses(w, r, hkLists(s, w))
   return { key, review, right, wrong: right, mode: 'kanji',
     head: `<div class="gq" lang="ja">「${r}」</div>`, prompt: `이렇게 읽는 낱말은${tag}`,
     choices: shuffle([w, ...others].map(x => ({ html: x, ok: x === w }))) }
@@ -168,7 +179,7 @@ function partQuestions(part, wrong) {
     let pool = Object.keys(KANJI).filter(c => part.grades.includes(KANJI[c].grade))
     if (!pool.length) pool = Object.keys(KANJI).filter(c => KANJI[c].grade >= 4 && KANJI[c].grade <= 6)   // 중학 한자가 아직 없을 때
     if (part.half != null && part.grades.length === 1) { const m = Math.ceil(pool.length / 2); pool = part.half ? pool.slice(m) : pool.slice(0, m) }
-    keys = pool.flatMap(c => [`m:${c}`, ...readIndexes(c, maxGrade).map(i => `r:${c}:${i}`)])
+    keys = meaningKeys(pool).concat(pool.flatMap(c => readIndexes(c, maxGrade).map(i => `r:${c}:${i}`)))
     make = k => { const q = k.startsWith('r:') ? makeReadQuestion(k, pool) : makeMeaningQuestion(k, pool); q.mode = 'kanji'; return q }
     return pickKeys(wrong.kanji, keys).slice(0, part.n).map(make)
   }
@@ -226,8 +237,14 @@ function makeReadQuestion(key, pool) {
   const k = KANJI[c]
   const [w, r, m] = k.examples[Number(i)]
   const len = r.length
-  const others = shuffle(pool.flatMap(x => KANJI[x].examples.map(e => e[1])).filter(x => x !== r && Math.abs(x.length - len) <= 1))
-  const misses = shuffle(nearMisses(r))
+  // 보기는 모두 낱말의 끝 가나(斬る의 る)와 같은 소리로 끝나야 한다. 같은 낱말의 다른 바른 읽기는 오답으로 쓰지 않는다
+  const tail = kanaTail(w), fair = x => x !== r && x.endsWith(tail) && !readsOf(w).has(x)
+  const readPool = (p, d) => shuffle(p.flatMap(x => KANJI[x].examples).filter(e => e[1].endsWith(tail) && (tail ? kanaTail(e[0]) : !kanaTail(e[0])) && Math.abs(e[1].length - len) <= d).map(e => e[1]).filter(fair))
+  const lower = Object.keys(KANJI).filter(x => KANJI[x].grade <= k.grade)
+  let others = readPool(pool, 1)
+  if (others.length < 12) others = [...others, ...readPool(lower, 1)]
+  if (new Set(others).size < 3) others = [...others, ...readPool(Object.keys(KANJI), 2), ...stemMisses(w, r, fair)]
+  const misses = shuffle(nearMisses(r).filter(fair))
   const picks = new Set([r])
   if (misses[0]) picks.add(misses[0])
   for (const x of others) { if (picks.size >= 4) break; picks.add(x) }
@@ -243,22 +260,100 @@ function makeReadQuestion(key, pool) {
   }
 }
 
+// ───── 낱말 보기 고르는 규칙 ─────
+// 낱말 모양: 한자는 漢으로 바꾸고 가나는 그대로 둔다 (斬る → 漢る, 余韻 → 漢漢)
+function wordShape(w) { return w.replace(/[\p{Script=Han}々]/gu, '漢') }
+function kanaTail(w) { return (w.match(/[ぁ-ゖ]+$/) || [''])[0] }
+function hira(s) { return s.replace(/[ァ-ヶ]/g, x => String.fromCharCode(x.charCodeAt(0) - 96)) }
+// 앱에 실린 낱말의 모든 읽기. 같은 낱말의 다른 바른 읽기가 오답으로 나오지 않게 한다
+let READS = null
+function readsOf(w) {
+  if (!READS) {
+    READS = new Map()
+    const add = (x, r) => { if (!READS.has(x)) READS.set(x, new Set()); READS.get(x).add(r) }
+    for (const c in KANJI) {
+      for (const e of KANJI[c].examples) add(e[0], e[1])
+      for (const r of KANJI[c].on) add(c, hira(r))
+      for (const r of KANJI[c].kun) {
+        const [head, tail] = r.replace(/^-|-$/g, '').split(/[.．（(]/)
+        if (!tail) add(c, head)
+      }
+    }
+    if (typeof HIGH_KANJI !== 'undefined') for (const l of Object.values(HIGH_KANJI)) for (const e of l) add(e[0], e[1])
+  }
+  return READS.get(w) || new Set()
+}
+// 소리가 얼마나 비슷한지: 첫소리·끝소리·겹치는 글자·길이
+// 끝 가나가 드문 낱말(貝がら)의 모자란 오답: 다른 한자의 소리에 같은 끝 가나를 붙인다
+function stemMisses(w, r, fair) {
+  const tail = kanaTail(w), n = r.length - tail.length
+  return shuffle(Object.keys(KANJI).flatMap(c => KANJI[c].examples).filter(e => !kanaTail(e[0]) && Math.abs(e[1].length - n) <= 1 && e[1] !== r.slice(0, n)).map(e => e[1] + tail).filter(fair)).slice(0, 8)
+}
+function soundLike(a, b) {
+  let n = (a[0] === b[0] ? 2 : 0) + (a[a.length - 1] === b[b.length - 1] ? 2 : 0) - Math.abs(a.length - b.length) * 2
+  for (const ch of new Set(a)) if (b.includes(ch)) n++
+  return n
+}
+// 읽기 r을 보고 낱말 w를 고르는 문제의 오답: 모양이 같고(오쿠리가나까지) 소리가 비슷한 낱말 3개
+function wordMisses(w, r, lists) {
+  const out = []
+  for (const list of lists) {
+    const seen = new Set()
+    const ok = list.filter(e => e[0] !== w && !out.includes(e[0]) && !seen.has(e[0]) && seen.add(e[0]) && e[1] !== r && !readsOf(e[0]).has(r) && wordShape(e[0]) === wordShape(w))
+    const best = shuffle(ok).sort((a, b) => soundLike(b[1], r) - soundLike(a[1], r)).slice(0, 6)
+    for (const e of shuffle(best)) if (out.length < 3) out.push(e[0])
+    if (out.length >= 3) break
+  }
+  return out
+}
+// 한자 하나를 음독으로만 읽는 말(韻 いん)은 같은 소리 한자가 너무 많아 소리만으로 물을 수 없다
+function bareOn(c, e) { return [...e[0]].length === 1 && KANJI[c].on.some(o => hira(o) === e[1]) }
+// 낱말을 모양별로 한 번만 나눠 둔다 (낱말마다 전체를 훑으면 졸업 시험을 여는 데 몇 초가 걸린다)
+// g: 그 낱말에 든 한자 가운데 가장 높은 학년
+let SHAPES = null
+function shapeList(w) {
+  if (!SHAPES) {
+    SHAPES = new Map()
+    const seen = new Set()
+    for (const c in KANJI) for (const e of KANJI[c].examples) {
+      const id = e[0] + '/' + e[1]
+      if (seen.has(id)) continue
+      seen.add(id)
+      const sh = wordShape(e[0]), g = Math.max(...[...e[0]].map(ch => KANJI[ch] ? KANJI[ch].grade : 0))
+      if (!SHAPES.has(sh)) SHAPES.set(sh, [])
+      SHAPES.get(sh).push([e[0], e[1], g])
+    }
+  }
+  return SHAPES.get(wordShape(w)) || []
+}
+// 오답이 될 낱말이 3개 이상 있는지만 빠르게 본다
+function hasMisses(w, r, list) {
+  const got = new Set()
+  for (const e of list) {
+    if (e[0] !== w && e[1] !== r && !readsOf(e[0]).has(r)) got.add(e[0])
+    if (got.size >= 3) return true
+  }
+  return false
+}
+const M_PICK = {}
+function meaningPick(c) {
+  if (c in M_PICK) return M_PICK[c]
+  const g = KANJI[c].grade, fit = w => [...w].every(ch => !KANJI[ch] || KANJI[ch].grade <= g)
+  const ex = KANJI[c].examples.find(e => fit(e[0]) && !bareOn(c, e) && hasMisses(e[0], e[1], shapeList(e[0]).filter(x => x[2] <= g)))
+  return (M_PICK[c] = ex ? { ex } : null)
+}
+function meaningKeys(pool) { return pool.filter(c => meaningPick(c)).map(c => `m:${c}`) }
+
 // "m:六" — 한국어 뜻 대신, 읽기를 보여 주고 그렇게 읽는 낱말을 고른다.
-// 같은 한자의 다른 낱말(六つ ↔ 六月)이 꼭 오답으로 들어가서 "한 글자 여러 읽기"를 가려내게 한다
 function makeMeaningQuestion(key, pool) {
   const c = key.split(':')[1]
   const k = KANJI[c]
   const ex = k.examples
-  // 그 학년까지 배운 한자로만 된 낱말을 쓴다 (1학년 字 문제에 3학년 漢이 나오지 않게)
-  const fit = w => [...w].every(ch => !KANJI[ch] || KANJI[ch].grade <= k.grade)
-  const okEx = ex.filter(e => fit(e[0])), useEx = okEx.length ? okEx : ex
-  const [w, r, m] = useEx[[...key].reduce((n, ch) => n + ch.charCodeAt(0), 0) % useEx.length]
-  const picks = [w]
-  for (const e of useEx) if (e[0] !== w && e[1] !== r && !picks.includes(e[0])) picks.push(e[0])
-  const others = shuffle(pool.filter(x => x !== c).flatMap(x => KANJI[x].examples).filter(e => e[1] !== r && fit(e[0]) && Math.abs(e[0].length - w.length) <= 1))
-  for (const e of others) { if (picks.length >= 4) break; if (!picks.includes(e[0])) picks.push(e[0]) }
-  // 그래도 모자라면 길이 제한 없이, 그 학년까지의 모든 한자 낱말에서 채운다
-  if (picks.length < 4) for (const e of shuffle(Object.keys(KANJI).filter(x => x !== c && KANJI[x].grade <= k.grade).flatMap(x => KANJI[x].examples).filter(e => e[1] !== r && fit(e[0])))) { if (picks.length >= 4) break; if (!picks.includes(e[0])) picks.push(e[0]) }
+  const pick = meaningPick(c)
+  if (!pick) return { ...makeReadQuestion(`r:${c}:0`, pool), key }   // 예전에 쌓인 복습 문제는 읽기 문제로 바꿔 낸다
+  const [w, r, m] = pick.ex
+  const list = shapeList(w).filter(x => x[2] <= k.grade)
+  const picks = [w, ...wordMisses(w, r, [list.filter(x => x[2] === k.grade), list])]
   const rest = ex.filter(e => e[0] !== w).map(e => `${e[0]}(${e[1]})`).join(' · ')
   return {
     key,
@@ -443,7 +538,7 @@ function readIndexes(c, grade) {
 function buildKanjiQuiz(grade, wrongKeys) {
   if (grade >= 10) return pickKeys(wrongKeys, highKanjiKeys([HK_GRADE[grade]])).map(makeHighKanjiQuestion)
   const pool = kanjiPool(grade)
-  const all = pool.flatMap(c => [`m:${c}`, ...readIndexes(c, grade).map(i => `r:${c}:${i}`)])
+  const all = meaningKeys(pool).concat(pool.flatMap(c => readIndexes(c, grade).map(i => `r:${c}:${i}`)))
   return pickKeys(wrongKeys, all).map(k => k.startsWith('r:') ? makeReadQuestion(k, pool) : makeMeaningQuestion(k, pool))
 }
 
