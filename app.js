@@ -1033,21 +1033,11 @@ const CAT_LINES = {
 // 오늘의 교정: 날마다 헷갈리는 문법 짝 하나를 단짝이 문제로 내 준다 (홈에서 바로 풀기)
 function todayCorrection() {
   const openG = id => { const x = GRAMMAR.find(y => y.id === id); return x && isOpen('grammar', x.level) ? x : null }
-  // 빈칸 바로 앞 글자가 같은 예문끼리만 짝을 지어, 모양만 보고 답이 드러나지 않게 한다
-  const before = jp => { const i = jp.indexOf('［'); return i > 0 ? jp[i - 1] : '' }
   const pool = []
   for (const g of GRAMMAR) {
     if (!isOpen('grammar', g.level) || !g.diff) continue
     const sims = (g.similar || []).map(openG).filter(Boolean)
-    g.examples.forEach((e, ei) => {
-      if (!e.jp.includes('［')) return
-      const ans = blankOf(e), opts = [ans]
-      for (const x of sims) for (const y of x.examples) {
-        const b = blankOf(y)
-        if (b && before(y.jp) === before(e.jp) && !opts.some(o => plainJp(o) === plainJp(b))) { opts.push(b); break }
-      }
-      if (opts.length >= 2) pool.push({ g, e, ei, ans, opts, sims })
-    })
+    g.examples.forEach((e, ei) => { const opts = gfPicks(g, ei); if (opts) pool.push({ g, e, ei, ans: opts[0], opts, sims }) })
   }
   if (!pool.length) return null
   const d = todayStr(), seed = [...d].reduce((n, ch) => (n * 37 + ch.charCodeAt(0)) % 100019, 11)
@@ -1158,9 +1148,11 @@ function missionsHTML(t, goal) {
 // 쪽지 시험(간격 반복): 틀린 문제가 1일 · 3일 · 7일 뒤에 돌아온다. 자신 있게 틀린 답을 먼저 낸다
 function dueKeys() {
   const rv = progress.review || {}, today = todayStr()
-  return Object.keys(rv).filter(k => !k.startsWith('gb:') && rv[k].due <= today)
+  return Object.keys(rv).filter(k => rv[k].due <= today && (!/^g[abcfjo]:/.test(k) || grammarAlive(k)))
     .sort((a, b) => (rv[b].sure ? 1 : 0) - (rv[a].sure ? 1 : 0) || rv[a].due.localeCompare(rv[b].due))
 }
+// 감수에서 빠진 문법 문제는 쪽지 시험에 내지 않는다
+function grammarAlive(k) { const g = grammarById(k.split(':')[1]); return !!g && grammarKeys(g).includes(k) }
 function sureCount() { return Object.values(progress.review || {}).filter(r => r.sure).length }
 function reviewCardHTML() {
   const rv = progress.review || {}, all = Object.values(rv), due = dueKeys().length
@@ -1771,7 +1763,7 @@ const ACTIONS = {
   checkOrder() {
     const qz = state.quiz, q = qz.list[qz.i]
     if (!q || !q.order || qz.built.length !== q.order.parts.length) return true
-    pick(qz.built.every((v, i) => v === i) ? 0 : 1)
+    pick(q.order.alt ? (gOrderOk(q.order.plain, q.order.alt, qz.built) ? 0 : 1) : qz.built.every((v, i) => v === i) ? 0 : 1)
     return true
   },
   setBuddy(btn) {

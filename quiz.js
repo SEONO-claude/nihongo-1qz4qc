@@ -376,50 +376,38 @@ function grammarPool(level, saved) {
   return GRAMMAR.filter(g => level === 'all' ? opened('grammar', g.level) : g.level === level)
 }
 
-// 오답 보기는 같은 급수에서 고른다 (모자라면 전체에서)
-function grammarOthers(g, pool, key) {
-  const same = shuffle(GRAMMAR.filter(x => x.id !== g.id && x.level === g.level))
-  const rest = shuffle(GRAMMAR.filter(x => x.id !== g.id && x.level !== g.level))
-  const picks = [], seen = new Set([key(g)])
-  for (const x of [...same, ...rest]) {
+// 뜻 문제의 오답: 감수한 헷갈리는 문법(near)에서 세 개. 뜻이나 모양이 같은 것은 빼고 고른다
+function grammarOthers(g) {
+  const picks = [], seen = new Set([g.meaning, patName(g)])
+  for (const x of shuffle((gq(g.id).near || []).map(grammarById).filter(Boolean))) {
     if (picks.length >= 3) break
-    if (!seen.has(key(x))) { seen.add(key(x)); picks.push(x) }
+    if (seen.has(x.meaning) || seen.has(patName(x))) continue
+    seen.add(x.meaning); seen.add(patName(x)); picks.push(x)
   }
   return picks
 }
+// 보기에 보이는 이름: 한국어 괄호 설명(용도·전문 따위)은 답을 알려 주므로 뺀다
+function patShow(g) { return g.pattern.replace(/\s*\([^()]*[가-힣][^()]*\)/g, '') }
+function patName(g) { return gfPlain(patShow(g)) }
+function gfPlain(s) { return s.replace(/\{([^{}|]+)\|[^{}|]+\}/g, '$1') }
 
 // 문법 하나에서 나오는 문제들
 //   ga 뜻 고르기 · gc 일본어 고르기 · gb 예문 속 문법 찾기   (알아보기)
 //   gf 빈칸 채우기 · gj 접속 형태 · go 문장 배열            (직접 말해 보기)
-// 빈칸 문제의 오답: 빈칸 바로 앞 글자가 같은 예문에서만 가져온다.
-// (飲ん（ ）에 てもいい처럼 모양만 봐도 틀린 보기가 나오지 않게) 3개를 못 채우면 그 빈칸 문제는 내지 않는다
-const GF_PICKS = {}
-function gfPlain(s) { return s.replace(/\{([^{}|]+)\|[^{}|]+\}/g, '$1') }
-function gfPrev(jp) { const p = gfPlain(jp), i = p.indexOf('［'); return i > 0 ? p[i - 1] : '' }
+// 문제마다 감수한 오답은 data/grammarq.js(GRAMMARQ)에 있다. 감수하지 않은 빈칸·뜻·형태 문제는 내지 않는다
+//   gf 예문 번호별 빈칸 오답 · near 뜻 문제의 오답이 될 문법 · ga/gc 낼지 · conn 형태 오답과 한국어 뜻 · alt 배열의 다른 바른 순서
+function gq(id) { return (typeof GRAMMARQ === 'undefined' ? {} : GRAMMARQ)[id] || {} }
 function gfPicks(g, ei) {
-  const key = g.id + ':' + ei
-  if (key in GF_PICKS) return GF_PICKS[key]
-  const e = g.examples[ei], ans = blankOf(e)
-  if (!ans) return (GF_PICKS[key] = null)
-  const pv = gfPrev(e.jp), LV = ['N5', 'N4', 'N3', 'N2', 'N1'], li = LV.indexOf(g.level)
-  const near = x => Math.abs(LV.indexOf(x.level) - li)
-  const order = [...(g.similar || []).map(grammarById).filter(Boolean), ...GRAMMAR.filter(x => x !== g).sort((a, b) => near(a) - near(b))]
-  const picks = [ans], seen = new Set([gfPlain(ans)])
-  for (const x of order) {
-    if (picks.length >= 4) break
-    for (const y of x.examples) {
-      const b = blankOf(y)
-      if (b && gfPrev(y.jp) === pv && !seen.has(gfPlain(b))) { picks.push(b); seen.add(gfPlain(b)); break }
-    }
-  }
-  return (GF_PICKS[key] = picks.length >= 4 ? picks : null)
+  const bad = (gq(g.id).gf || {})[ei], e = g.examples[ei], ans = e && blankOf(e)
+  return bad && ans ? [ans, ...bad] : null
 }
 function grammarKeys(g) {
-  // "쓰인 문법은"(gb)은 정답이 문장에 그대로 보여서 내지 않는다
-  const k = [`ga:${g.id}`, `gc:${g.id}`]
-  g.examples.forEach((e, i) => { if (e.jp.includes('［') && gfPicks(g, i)) k.push(`gf:${g.id}:${i}`) })
-  if (g.conn) k.push(`gj:${g.id}`)
-  if (g.order) k.push(`go:${g.id}`)
+  const q = gq(g.id), k = []
+  if (q.ga && grammarOthers(g).length === 3) k.push(`ga:${g.id}`)
+  if (q.gc && grammarOthers(g).length === 3) k.push(`gc:${g.id}`)
+  g.examples.forEach((e, i) => { if (gfPicks(g, i)) k.push(`gf:${g.id}:${i}`) })
+  if (g.conn && q.conn) k.push(`gj:${g.id}`)
+  if (g.order && q.order !== false) k.push(`go:${g.id}`)
   return k
 }
 // 예문 표시: ［ ］ 표시는 지우거나(문제) 칠해서(설명) 보여 준다
@@ -428,6 +416,11 @@ function gMark(s) { return furi(s).replace(/［([^［］]*)］/, '<mark class="g
 function blankOf(e) { const m = e.jp.match(/［([^［］]*)］/); return m ? m[1] : null }
 const plainJp = s => s.replace(/\{([^{}|]+)\|[^{}|]+\}/g, '$1')
 
+// 배열 정답인지: 정해진 순서이거나, 뜻이 같은 다른 바른 순서(alt)이면 맞다
+function gOrderOk(parts, alt, order) {
+  const say = o => o.map(i => parts[i]).join('')
+  return [parts.map((_, i) => i), ...alt].some(o => say(o) === say(order))
+}
 function makeGrammarQuestion(qkey) {
   const [type, id, ex] = qkey.split(':')
   const g = grammarById(id)
@@ -437,13 +430,8 @@ function makeGrammarQuestion(qkey) {
   if (type === 'gf') {
     // 빈칸: 정답은 ［ ］ 속 글자, 오답은 헷갈리는 짝 → 같은 급수 순서로
     const e = g.examples[Number(ex)], ans = blankOf(e)
-    let picks = gfPicks(g, Number(ex))
-    if (!picks) {   // 예전에 저장된 키: 예전 방식으로
-      const cands = [...sim, ...shuffle(GRAMMAR.filter(x => x.level === g.level && x !== g))]
-        .map(x => x.examples.map(blankOf).find(Boolean)).filter(Boolean)
-      picks = [ans]
-      for (const c of cands) { if (picks.length >= 4) break; if (!picks.some(x => plainJp(x) === plainJp(c))) picks.push(c) }
-    }
+    const picks = gfPicks(g, Number(ex))
+    if (!picks) return null   // 예전에 쌓인, 지금은 내지 않는 문제
     return {
       key: qkey,
       head: `<div class="gsent" lang="ja">${furi(e.jp.replace(/［[^［］]*］/, '<span class="blank">（　　）</span>'))}</div>`,
@@ -456,27 +444,29 @@ function makeGrammarQuestion(qkey) {
     }
   }
   if (type === 'gj') {
-    const c = g.conn
+    const c = g.conn, cq = gq(id).conn
+    if (!cq) return null
     return {
       key: qkey,
       head: `<div class="gsent" lang="ja">${furi(c.before)}<span class="blank">（　　）</span>${furi(c.after)}</div>`,
-      prompt: `알맞은 형태는 <span class="dim">· ${g.connect}</span>${lvTag}`,
-      choices: shuffle([c.ok, ...c.bad].map(x => ({ html: furi(x), ok: x === c.ok }))),
+      prompt: `알맞은 형태는 <span class="dim">· ${cq.ko}</span>${lvTag}`,
+      choices: shuffle([c.ok, ...cq.bad].map(x => ({ html: furi(x), ok: x === c.ok }))),
       right: `${furi(g.pattern)} · ${g.connect}`,
       wrong: `${furi(g.pattern)} · 접속: ${g.connect}`,
-      review: `<span class="jp" lang="ja">${furi(c.before)}<mark class="gmark">${furi(c.ok)}</mark>${furi(c.after)}</span><span class="dim">${g.connect}</span>`,
+      review: `<span class="jp" lang="ja">${furi(c.before)}<mark class="gmark">${furi(c.ok)}</mark>${furi(c.after)}</span><span class="dim">${cq.ko}</span>`,
     }
   }
   if (type === 'go') {
     // 배열: 조각을 눌러 순서대로 놓는다 (choices는 맞음/틀림 두 칸만 쓰고, 화면은 order로 그린다)
     const parts = g.order.jp.split(' / ')
     let mix = shuffle(parts.map((_, i) => i))
-    if (mix.every((v, i) => v === i)) mix = [...mix.slice(1), mix[0]]
+    const alt = gq(id).alt || []
+    while (gOrderOk(parts, alt, mix)) mix = shuffle(mix)
     return {
       key: qkey,
       head: `<div class="gq ko">${g.order.ko}</div>`,
       prompt: `순서대로 놓아 문장을 만들어요${lvTag}`,
-      order: { parts: parts.map(furi), mix },
+      order: { parts: parts.map(furi), mix, alt, plain: parts },
       choices: [{ html: '', ok: true }, { html: '', ok: false }],
       right: `${furi(g.pattern)} = ${g.meaning}`,
       wrong: `${gText(g.order.jp.replace(/ \/ /g, ''))}`,
@@ -484,12 +474,13 @@ function makeGrammarQuestion(qkey) {
     }
   }
   const plainPattern = x => x.pattern.replace(/\{([^{}|]+)\|[^{}|]+\}/g, '$1')
+  if (!gq(id)[type] && type !== 'gb') return null
   const review = `<span class="jp" lang="ja">${furi(g.pattern)}</span><span class="dim">${g.meaning}</span>`
   const right = `${furi(g.pattern)} = ${g.meaning}`
   const wrong = `${furi(g.pattern)} = ${g.meaning} · ${g.explain.replace(/\.$/, '')}`
   const lv = ` <span class="gqlv">${g.level}</span>`
   if (type === 'ga') {
-    const others = grammarOthers(g, null, x => x.meaning)
+    const others = grammarOthers(g)
     return {
       key: qkey, review, right, wrong,
       head: `<div class="gq" lang="ja">${furi(g.pattern)}</div>`,
@@ -498,22 +489,22 @@ function makeGrammarQuestion(qkey) {
     }
   }
   if (type === 'gc') {
-    const others = grammarOthers(g, null, plainPattern)
+    const others = grammarOthers(g)
     return {
       key: qkey, review, right, wrong,
       head: `<div class="gq ko">${g.meaning}</div>`,
       prompt: '일본어로 하면' + lv,
-      choices: shuffle([g, ...others].map(x => ({ html: furi(x.pattern), ok: x === g }))),
+      choices: shuffle([g, ...others].map(x => ({ html: furi(patShow(x)), ok: x === g }))),
     }
   }
   // gb: 예문 속 문법 찾기
   const e = g.examples[Number(ex)]
-  const others = grammarOthers(g, null, plainPattern)
+  const others = grammarOthers(g)
   return {
     key: qkey, review, right: `${right} · ${e.ko}`, wrong: `${right} · ${e.ko}`,
     head: `<div class="gsent" lang="ja">${gText(e.jp)}</div>`,
     prompt: '쓰인 문법은' + lv,
-    choices: shuffle([g, ...others].map(x => ({ html: furi(x.pattern), ok: x === g }))),
+    choices: shuffle([g, ...others].map(x => ({ html: furi(patShow(x)), ok: x === g }))),
   }
 }
 
