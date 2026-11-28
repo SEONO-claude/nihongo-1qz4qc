@@ -1109,10 +1109,19 @@ function applyPlacement(qz) {
   checkBadges(); saveProgress()
   return { label: t.label, skipped }
 }
-function placeResultHTML(p) {
-  return `<div class="mockres pass"><div class="mockscore"><b>${p.label}</b></div>
-    <p>${p.skipped ? `${p.skipped}칸을 건너뛰고 여기서 시작해요 · 건너뛴 칸은 성적 「미」로 채워 두었어요` : '처음부터 차근차근 시작해요'}</p>
-    <div class="actions"><button class="btn pri" data-act="questContinue">여기서 시작</button></div></div>`
+function placeDoneView(qz) {
+  const p = qz.place, [school, ...rest] = p.label.split(' ')
+  const list = qz.missed.length ? `<div class="row">틀린 문제 ${qz.missed.length}개는 내일 쪽지 시험에 다시 나와요</div>${qz.missed.map(q => `<div class="row wrongrow">${q.review}</div>`).join('')}` : ''
+  return `<div class="panel">
+    <div class="placedone">${mascot('cheer')}
+      <small>${qz.list.length}문제 중 ${qz.right}개 정답 · 시작할 학기</small>
+      <h1><span>${school}</span> <span>${rest.join(' ')}</span></h1>
+      <p>${p.skipped ? `앞의 ${p.skipped}칸은 통과로 했어요<br>성적은 「미」, 다시 풀어 올릴 수 있어요` : '처음부터 차근차근 시작해요'}</p>
+      <button class="btn pri" data-act="questContinue">여기서 시작</button>
+      <button class="btn" data-go="home">홈으로</button>
+    </div>
+    ${rewardsHTML(qz)}${list}
+  </div>`
 }
 
 // ───── 성취감: 오늘의 미션 · 복습 · 모의고사 · 성적표 ─────
@@ -1365,7 +1374,7 @@ function stageDoneView() {
     </div>
     <div class="actions"><button class="btn" data-act="reportCard" data-school="${sc.id}">성적표 저장 · 공유</button></div>` : ''
   const list = qz.missed.length
-    ? `<div class="row">틀린 문제 ${qz.missed.length}개는 다음에 다시 나와요</div>${qz.missed.map(q => `<div class="row wrongrow">${q.review}</div>`).join('')}` : ''
+    ? `<div class="row">틀린 문제 ${qz.missed.length}개는 내일 쪽지 시험에 다시 나와요</div>${qz.missed.map(q => `<div class="row wrongrow">${q.review}</div>`).join('')}` : ''
   const nextBtn = passed && next
     ? `<button class="btn pri" data-act="startStage" data-id="${next.id}">${qz.graduated ? `${schoolOf(next.school).name} 입학하기` : `다음 · ${next.name}`}</button>`
     : passed ? '' : `<button class="btn pri" data-act="startStage" data-id="${st.id}">다시 도전</button>`
@@ -1490,7 +1499,7 @@ function quizView() {
   const last = qz.i === qz.list.length - 1
   // 알림 칸: 맞혔을 때·틀렸을 때 설명 중 긴 쪽 크기로 자리를 미리 잡아 둔다.
   // 그래서 답을 골라도 문제·보기가 움직이지 않고, 설명은 잘리지 않고 다 보인다.
-  const sureNote = '망설임 없이 고른 답이 틀렸어요. 이렇게 고친 답이 가장 오래 기억에 남아요 · 내일 쪽지 시험에 나와요'
+  const sureNote = '망설임 없이 고른 답이 틀렸어요. 지금 설명을 한 번 더 읽어 두세요 · 내일 쪽지 시험에 나와요'
   const badNote = real => !real || qz.sureWrong ? sureNote : '내일 쪽지 시험에 다시 나와요'
   const fb = (good, real) => `<div class="feedback ${good ? 'good' : 'bad'}${!good && real && qz.sureWrong ? ' sure' : ''}">
     <div class="in">
@@ -1512,6 +1521,7 @@ function quizView() {
 
 function quizDoneView() {
   const qz = state.quiz
+  if (qz.place) return placeDoneView(qz)
   const total = qz.list.length
   const perfect = qz.right === total
   const list = qz.missed.length
@@ -1531,7 +1541,6 @@ function quizDoneView() {
       </div>
     </div>
     ${qz.mock ? mockResultHTML(qz.mock) : ''}
-    ${qz.place ? placeResultHTML(qz.place) : ''}
     ${qz.newStamp ? `<div class="talkstampwin"><span class="tstamp big" lang="ja">${qz.newStamp.mark}</span><div><b>${qz.newStamp.name} 도장</b><small>장면 도장 ${Object.keys(progress.talkStamps).length} / ${TALK.length}</small></div></div>` : ''}
     ${state.quizMode === 'talk' && state.talkQuiz !== 'all' && !qz.newStamp && !progress.talkStamps[state.talkQuiz] ? `<p class="locknote">10문제 중 8개 이상 맞히면 장면 도장을 받아요</p>` : ''}
     ${qz.fixedSure ? `<div class="surefixed"><b class="num">${qz.fixedSure}개</b><span>잘못 알던 답을 이번에 고쳤어요</span></div>` : ''}
@@ -1558,7 +1567,7 @@ function pick(i) {
   markStudy()
   // 기억 강도 복습: 틀리면 내일, 맞히면 3일 → 7일 뒤, 세 번 넘기면 끝
   const rv = progress.review || (progress.review = {})
-  // 잘못 알던 답: 3.5초 안에 망설임 없이 골랐는데 틀리면 '자신 있게 틀린 답'. 이런 실수는 고치면 가장 오래 기억에 남는다
+  // 잘못 알던 답: 3.5초 안에 망설임 없이 골랐는데 틀리면 '자신 있게 틀린 답'. 쪽지 시험에서 먼저 다시 낸다
   const fast = Date.now() - (qz.qStart || 0) < 3500 && !q.order
   qz.sureWrong = !ok && fast
   qz.sureFixed = false
